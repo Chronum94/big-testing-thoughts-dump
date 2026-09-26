@@ -32,4 +32,4 @@ The 2.5k file was written as `mad_dimtri.traj` before the script took the `_{N}`
 ## Running
 Scripts and configs use relative paths (`models/`, `*.traj`); run them from a directory that has `models/` and
 the data files next to them. `run_*.sh` hard-code `~/scratch/factorized_radial`. Environment: apax branch
-`factorized-radial` (local to the original machine, not pushed as of 2026-09-26), run via `run_cfg.py`.
+`factorized-radial` of github.com/Chronum94/apax (commit `e568f1dd`), run via `run_cfg.py`.

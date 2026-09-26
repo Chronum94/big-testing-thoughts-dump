@@ -660,7 +660,7 @@ See also `CRITIQUE.md` for the prioritised list.
 - M3GNet — Nat. Comput. Sci. 2022; Interpolation of alchemical DOFs in MLIPs — Nat. Commun. 2025
 - Rendle, Factorization Machines (2010)
 
-## 11. Code state (branch `factorized-radial`, uncommitted, 2026-09-26)
+## 11. Code state (branch `factorized-radial` of github.com/Chronum94/apax, commit `e568f1dd`, 2026-09-26)
 - `apax/layers/descriptor/basis_functions.py`: `FactorizedRadialFunction` — fields `rank`, `emb_jitter`,
   `factor_mode` (cp|centre|nbr), `residual` (dense Δ). Single init path (1+jitter·N(0,1); C=½+√rank·U[−½,½]; 1/rank).
 - `apax/config/model_config.py` (GMNN): `radial_rank`, `radial_emb_jitter` (0.1), `radial_factor_mode` ("cp"),
@@ -671,6 +671,6 @@ See also `CRITIQUE.md` for the prioritised list.
   tried and reverted.
 - CMNN was ported temporarily for §6.16 and then **removed** from this branch (lives on `cmnn-descriptor`; the
   Bessel adapter + safe-distance fix were not carried back). CMNN models in models/ need that code to reload.
-- Not done: unit tests, commit, regression-shift λ warning, matmul precision, `radial_materialize` table path.
+- Not done: unit tests for the new module, regression-shift λ warning, matmul precision, `radial_materialize` table path.
 - Scratch runs launch via `run_cfg.py`; eval via `eval_multi.py seeds models…` (env `TAG`=2k5|5k|5kbs8|10k|20k),
   `eval_fbins.py`, `core_rank.py`.

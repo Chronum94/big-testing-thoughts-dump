@@ -10,8 +10,7 @@ CP (canonical polyadic, a.k.a. CANDECOMP/PARAFAC tensor decomposition) factorisa
 
 The configs here use options that don't exist in upstream apax (`radial_rank`, `radial_emb_jitter`,
 `radial_factor_mode`, `radial_residual`, optimizer `residual_wd`). You need the **`factorized-radial` branch of
-[github.com/Chronum94/apax](https://github.com/Chronum94/apax)**. As of 2026-09-26 that branch has not been
-pushed yet; it lives only on the original machine.
+[github.com/Chronum94/apax](https://github.com/Chronum94/apax/tree/factorized-radial)** (commit `e568f1dd`).
 
 ## Method in one line
 
