@@ -1,0 +1,95 @@
+callbacks:
+- name: csv
+ckpt_interval: 500
+data:
+  batch_size: 1
+  data_path: etoh_aug3.traj
+  dataset:
+    processing: cached
+    shuffle_buffer_size: 1000
+  directory: models/
+  energy_unit: eV
+  experiment: ab_fr_r8j0.1_s2
+  n_train: 1496
+  n_valid: 155
+  pos_unit: Ang
+  scale_method: per_element_custom_scale
+  scale_options:
+    factors:
+      1: 5.301
+      6: 5.302
+      8: 5.302
+  shift_method: isolated_atom_energy_shift
+  shift_options:
+    E0s:
+      1: 0.0013337135314941406
+      6: 0.0019750595092773438
+      8: 0.0022177696228027344
+  valid_batch_size: 100
+data_parallel: true
+loss:
+- atoms_exponent: 1
+  loss_type: mse
+  name: energy
+  weight: 1.0
+- atoms_exponent: 1
+  loss_type: mse
+  name: forces
+  weight: 1.0
+metrics:
+- name: energy
+  reductions:
+  - mae
+- name: forces
+  reductions:
+  - mae
+  - mse
+model:
+  b_init: zeros
+  basis:
+    n_basis: 8
+    name: bessel
+    r_max: 5.0
+  calc_hessian: false
+  calc_stress: false
+  descriptor_dtype: fp32
+  emb_init: uniform
+  empirical_corrections:
+  - name: nlh
+    r_max: 6.0
+  ensemble: null
+  n_contr: 8
+  n_radial: 5
+  name: gmnn
+  nn:
+  - 64
+  - 32
+  - 16
+  radial_emb_jitter: 0.1
+  radial_rank: 8
+  radial_transform: covalent
+  readout_activation: elu
+  readout_dtype: fp32
+  scale_shift_dtype: fp64
+  use_bias: false
+  use_ntk: false
+  w_init: lecun
+n_epochs: 40
+optimizer:
+  emb_lr: 0.001
+  kwargs: {}
+  name: adam
+  nn_lr: 0.001
+  scale_lr: 0.01
+  schedule:
+    decay_factor: 0.93
+    name: cyclic_cosine
+    period: 40
+  shift_lr: 0.0
+  zbl_lr: 0.0001
+patience: null
+progress_bar:
+  disable_batch_pbar: true
+  disable_epoch_pbar: false
+seed: 2
+weight_average: null

@@ -1,0 +1,6 @@
+mad5k_r8j0.1centre_s1
+mad5k_r8j0.1nbr_s1
+mad5k_r8j0.1centre_s2
+mad5k_r8j0.1nbr_s2
+mad5k_r8j0.1centre_s3
+mad5k_r8j0.1nbr_s3

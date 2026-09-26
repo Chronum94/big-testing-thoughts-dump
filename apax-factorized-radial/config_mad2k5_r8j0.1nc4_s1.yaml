@@ -1,0 +1,85 @@
+callbacks:
+- name: csv
+ckpt_interval: 500
+data:
+  batch_size: 16
+  data_path: mad_dimtri.traj
+  dataset:
+    processing: cached
+    shuffle_buffer_size: 1000
+  directory: models/
+  energy_unit: eV
+  experiment: mad2k5_r8j0.1nc4_s1
+  n_train: 2250
+  n_valid: 250
+  pos_unit: Ang
+  scale_method: per_element_force_rms_scale
+  shift_method: per_element_regression_shift
+  shift_options:
+    energy_regularisation: 1.0e-06
+  valid_batch_size: 250
+data_parallel: true
+loss:
+- atoms_exponent: 1
+  loss_type: mse
+  name: energy
+  weight: 1.0
+- atoms_exponent: 1
+  loss_type: mse
+  name: forces
+  weight: 1.0
+metrics:
+- name: energy
+  reductions:
+  - mae
+- name: forces
+  reductions:
+  - mae
+  - mse
+model:
+  b_init: zeros
+  basis:
+    n_basis: 8
+    name: bessel
+    r_max: 5.0
+  calc_hessian: false
+  calc_stress: false
+  descriptor_dtype: fp32
+  emb_init: uniform
+  empirical_corrections: []
+  ensemble: null
+  n_contr: 4
+  n_radial: 5
+  name: gmnn
+  nn:
+  - 64
+  - 32
+  - 16
+  radial_emb_jitter: 0.1
+  radial_rank: 8
+  radial_transform: identity
+  readout_activation: elu
+  readout_dtype: fp32
+  scale_shift_dtype: fp64
+  use_bias: false
+  use_ntk: false
+  w_init: lecun
+n_epochs: 200
+optimizer:
+  emb_lr: 0.001
+  kwargs: {}
+  name: adam
+  nn_lr: 0.001
+  scale_lr: 0.01
+  schedule:
+    decay_factor: 0.93
+    name: cyclic_cosine
+    period: 200
+  shift_lr: 0.0
+  zbl_lr: 0.0001
+patience: null
+progress_bar:
+  disable_batch_pbar: true
+  disable_epoch_pbar: false
+seed: 1
+weight_average: null
