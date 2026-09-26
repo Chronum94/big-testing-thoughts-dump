@@ -4,7 +4,7 @@
 # Factorized species-pair radial functions for GMNN (apax)
 
 Replacing GMNN's dense (119 × 119 × n_radial × n_basis) species-pair radial coefficient table with a low-rank
-CP factorisation over per-element embeddings, tested on MAD-1.6 dimers/trimers and ethanol.
+CP (canonical polyadic, a.k.a. CANDECOMP/PARAFAC tensor decomposition) factorisation over per-element embeddings, tested on MAD-1.6 dimers/trimers and ethanol.
 
 ## Requirements: custom apax branch
 

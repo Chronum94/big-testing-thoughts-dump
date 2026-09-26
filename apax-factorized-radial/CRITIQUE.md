@@ -3,7 +3,7 @@
 Companion to `FACTORIZED_RADIAL.md`.
 
 ## Summary
-Claim: a CP-factorised species-pair radial function generalises better than GMNN's dense pair table on sparse
+Claim: a CP-factorised (canonical polyadic tensor decomposition) species-pair radial function generalises better than GMNN's dense pair table on sparse
 multi-element data. Evidence: MAD dimers + trimers at 2.5k/5k/10k frames, 3–5 seeds for the main comparisons,
 dense given a weight-decay scan and its best-validation checkpoint.
 

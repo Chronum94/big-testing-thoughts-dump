@@ -62,7 +62,7 @@ radial_r(r; Zc, Zn) = norm · Σ_k u_k(Zc) · v_k(Zn) · (C_k · basis(r))_r
 - **Alchemical compression / TRACE**: `v_k(Zn)·(C_k·basis)` is exactly a pseudo-element channel with its own radial.
 - **MACE layer-1 A-basis**: A_{i,k} = Σ_j W_{k,Zj} R_k(r_ij) Y — same structure, but MACE keeps k as a feature
   channel, uses an MLP radial, and adds the centre element later.
-- **What's specific to ours**: an explicit **centre factor u_k(Zc)** inside the radial → full **CP decomposition** of
+- **What's specific to ours**: an explicit **centre factor u_k(Zc)** inside the radial → full **CP (canonical polyadic, a.k.a. CANDECOMP/PARAFAC) tensor decomposition** of
   the (Zc, Zn, basis, radial) coefficient tensor; and **collapse over k** into n_radial outputs (rank decoupled from
   output width).
 - **Cross-field**: factorization machines (Rendle 2010) / low-rank matrix completion — bilinear pair interaction of
