@@ -784,6 +784,18 @@ so the ordering just tracked training length. With **patience 100** (best-val ck
 
   **n_radial 3 ≡ 5 at 20k within seed noise** (per-seed val F gap +4.7%, −1.4%, +0.1%); 3 is also more
   seed-stable. The earlier random-split 2-seed gap (+4%) was split noise.
+- **Bulk 2.5k** (`mad_bulk_2500.traj`: mc3d/rattled/random; fixed split 2250/250, `mad_bulk_2500_{train,val}.traj`;
+  r_max 5, ~34 nbrs/atom p50, max 63; E+F only; 100 ep; 3 seeds; models `bulk2k5_fixval_nr{3,5}_s{1,2,3}`):
+
+  | n_radial | train F | val F | val F MSE | val E |
+  |---|---|---|---|---|
+  | 3 | 0.243 ± 0.018 | 0.257 ± 0.016 | 0.61 | 6.4 |
+  | 5 | **0.212 ± 0.009** | **0.234 ± 0.014** | **0.51** | 6.0 |
+
+  Per-seed val F gap (3 vs 5): +6%, +25%, 0% → paired +0.023 ± 0.029: leans 5 (~10%), not established. Train F is
+  lower for 5 in every seed (3–21%) → bulk uses more radial channels; clusters don't. 5 costs ~1.6× time/epoch on bulk.
+  **Energy is broken for both** (~6 eV/structure ≈ 0.4 eV/atom, flat over 100 ep) → check the regression shift on
+  all-electron bulk energies / per-structure E vs summed F loss balance.
 
 ### 6.25 What limits fitting large forces (analysis; consistent with §6.17, 6.20, 6.22–6.24)
 1. Slope bound: |F| ≤ readout Jacobian norm × |∂G/∂r|. ∂G/∂r is bounded by the basis (8 Bessel over 7 Å ≈ 3.6 Å⁻¹ max
@@ -875,7 +887,7 @@ Supported (5 or 3 seeds, gap ≫ seed spread, dense given best-val checkpoint + 
 17. More epochs improve typical frames but over-fit the force tail (val F MSE doubles after ep ~250 of 1000).
 18. Capacity knobs remain null at 20k: n_basis 16 worse (init-scale confounded), readout [64,64,64] ≈ [64,32,16].
 19. n_radial saturates at 2–3 on dimers/trimers (2.5k: 3 ≈ 4 ≈ 5; 20k fixed split, 3 seeds: 3 ≡ 5, paired val F
-    +1% ± 3%) — ¼ the descriptor.
+    +1% ± 3%) — ¼ the descriptor. Bulk 2.5k leans 5 (val F −10%, train lower in all 3 seeds; not established).
 20. Random-weight GMNN is smooth at the cutoff and force sensitivity decays ~3–4×/Å out to exactly 0 at 2r_c.
 
 Not yet shown:
