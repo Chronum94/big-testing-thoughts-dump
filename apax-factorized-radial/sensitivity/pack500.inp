@@ -1,0 +1,9 @@
+tolerance 1.3
+filetype xyz
+output carbon500.xyz
+seed 7
+pbc 0. 0. 0. 18.04 18.04 18.04
+structure C.xyz
+  number 500
+  inside box 0. 0. 0. 18.04 18.04 18.04
+end structure

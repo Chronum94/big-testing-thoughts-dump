@@ -76,6 +76,10 @@ GM contractions and the body order they can carry:
 - Hybrid CP + Δ (§6.13): wd 0.1 memorises, 1.0 overfits seen, 10 ≳ rank 8; freeze-start no effect (reverted).
 - **External validity (new, important)**: ethanol 3 seeds — rank 8 j0.1 ~36% worse than dense, underfits.
   Claim must be scoped to sparse multi-element regimes; hybrid/jitter choice is dataset-dependent.
+- Floor investigation (FACTORIZED_RADIAL §6.17–6.21): floor = loss imbalance + optimisation + data hygiene; capacity
+  fine on clean data. **New important**: elu output saturation makes strongly bound structures unlearnable (confirmed
+  K=20); ~1.4% of gas-phase structures unfittable at r_max 5. All apax comparisons so far used elu → re-baseline
+  with identity output before final claims.
 - New minor: 20k has few unseen-pair val frames (pair quartiles 3/4/6) → unseen metrics noisier at scale; consider
   designed hold-out instead.
 

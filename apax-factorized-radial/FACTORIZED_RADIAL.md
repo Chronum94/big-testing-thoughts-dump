@@ -204,6 +204,24 @@ equals dense regardless of rank.
   cheaper than CP on-the-fly at rank 8. Static embedding ⇒ materialise the table at inference: dense runtime
   with CP generalisation. (Optional `radial_materialize` path — not implemented.)
 
+### 4.6 Padded-row moments, einsum-free contractions (branch `moment-speedups` off `model-improvements`, apax)
+Prompted by a GPU write-up done on another machine (4478-atom bulk, E+F: 3.36 → 2.00 ms; fp32 force accumulation
+~0.65 ms, packed symmetric moments ~0.35, row-layout neighbour reduction ~0.35; "dense" (gather per-pair results into
+rows) ≈ "rows" (radial fn in row layout)). Implemented (commits `2930dcf6`, `178e6861`, not pushed):
+- `apax/layers/descriptor/rows.py`: pair → cell (centre·K + k) computed in-jit (stable argsort on `idx[1]`, the
+  centre; padded (0,0)/self-image pairs use the `mask_by_neighbor` rule; invalid/overflow pairs get *unique* OOB
+  cells). `to_rows` = scatter-**set** with `unique_indices=True`: its transpose is a gather and that gather's transpose
+  is again a non-atomic scatter → no atomics in force or param-gradient passes, and Hessians still work (no custom_vjp).
+  Moments = broadcast-multiply + sum over the minor K axis; m2/m3 packed as 6/10 components.
+- Contractions rewritten as broadcast products (all 8; both layouts): apax sets no matmul precision, so the old
+  einsums were TF32 dot_generals on Ampere+. Packed m2/m3 used directly for contr_2/3 with multiplicities.
+- Config: `nbr_rows: K` (0 = sparse segment_sum); K static, overflow silently dropped (must cover densest atom).
+  `distance_dtype: fp32|fp64` (default fp64) → fp32 positions/displacements = fp32 force accumulation.
+- Checks: descriptor rows vs sparse vs old einsum in fp64: features/grads to ~1e-15 (a 1e-7 discrepancy was the test's
+  fp32 radial fn). Full model NaCl 216 atoms: rows fp64 E/F/S within 1e-8/9e-9/8e-8; fp32 distances F 1e-7,
+  S 6e-7, ΣF 1e-8. 43 unit tests + `test_rows.py` pass. No GPU here: CPU timings flat (12–13.5 ms, 512 atoms);
+  GPU benchmark `apaximprovementstesting/moment_speedups/bench.py N` still to run.
+
 ## 5. Precision analysis
 
 Requirement: E and F smooth in positions; distances + basis in fp32 (reference resolution); energy changes ~1e-7.
@@ -584,9 +602,246 @@ gave NaN forces from zero-length padded pairs). Config: Bessel 8/5, n_radial 5, 
   With more data CMNN falls behind CP: higher train floor = more constrained/slower-fitting, ~40% slower per
   epoch (extra MP pass). On dimers/trimers CP is strictly better value.
 
+### 6.17 Why training stalls: the floor investigation (2.5k MAD dimers/trimers, rank 8 j0.1, seed 1)
+The training curve plateaus at train E ≈ 1.5 eV/structure, train F ≈ 0.23 eV/Å (log minima). Tests:
+
+| Change | min train E | min train F | seen F | unseen F | verdict |
+|---|---|---|---|---|---|
+| baseline (MSE, elu) | 1.53 | 0.23 | 0.58 | 0.90 | – |
+| energy-only loss (F weight 0) | **0.78** | (1.2, unfitted) | – | – | force term competes with energy |
+| train on max\|F\|<20 frames only | **1.00** | **0.14** | – | – | outliers drive the floor (common low-F set: E 1.72→1.22, \|F\|<1 bin 0.85→0.63) |
+| Huber δ=1 on forces | 1.35 | 0.22 | 0.52 | 0.81 | helps ~10% incl. high-force bins; low-F floor unchanged |
+| identity output activation | 1.52 | 0.22 | 0.51 | 0.95 | no effect (bounded-output hypothesis rejected) |
+| nonlinear embedding 1+elu/tanh(u−1) | 1.53 | 0.23 | 0.54–0.55 | 0.94–0.95 | no effect |
+| n_contr 4 (low-F set) | – | – | – | – | ≈ n_contr 8 |
+| readout [128,64,32], rank 64, 12/7 basis (20k) | – | – | – | – | no effect on forces (§6.11) |
+
+Per-sample gradient probe (trained checkpoint): per-sample |g| heavy-tailed (p90/median ~25–50×,
+max/median ~300–800×); the 15% of frames with max\|F\|≥20 contribute ~71–75% of total gradient on u, v, C — for
+the **energy** term too (corr(|g|, log max\|F\|) ≈ +0.5); force term 5–10× energy term at the median.
+
+Fitting capacity (bare JAX loop, full batch, same model):
+- 1 snapshot: exact (loss ~1e-15) in ~1k steps; apax pipeline on one trimer ×2500: < 1e-5 in 2 epochs → pipeline OK.
+- 2 snapshots (random, sharing one element, or disjoint): exact, but 4–16k steps; high-force pairs slowest and
+  constant-lr Adam repeatedly leaves the minimum (1e-12 → 3e-2 spikes).
+- K = 3 with disjoint elements: exact.
+- Cosine-annealed Adam, 50k steps: K ≤ 18 exact; random (non-nested) K = 19, 20 broke — **caused by specific
+  structures** (below), not count. Nested sets restricted to structures with all pairs ≤ 4 Å: **K = 15–25 all exact**
+  (loss ~1e-13). K = 50–200 random: E fits to ≤ 5e-4, F residual 1e-3–2e-2 carried entirely by low-force structures
+  (high-force ones fitted to ~1e-6) — the MSE favours the wall.
+- Conclusion: no per-structure capacity limit at small K; the 2.5k floor is loss imbalance + optimisation
+  (minibatch noise, step budget, Adam spikes) + data issues + output-activation saturation (§6.20).
+- **K = 500, all pairs < 4 Å, nested, 50k steps cosine** (`overfit_sweep.py 500 50000 0 detail --within4.0`):
+  F MAE 0.036 → 0.017 → 0.0088 → 0.0069 → **0.0059** (10k…50k steps), E MAE **0.045**; high-force (82) F MAE 0.0008,
+  low-force 0.0069. ~40× below apax's rank-8 training floor (0.23 on 2,250). Worst structures stuck from step 20k:
+  HBr (F MAE 0.65 = |F|/3), CrThTi (0.57), AmPd (0.24) — predicted force ≈ 0 (see §6.20).
+- Dense cannot fit isolated-atom structures either: on the 21 in its training set it predicts exactly 0 force
+  (F MAE 0.087 on them), contributing only ~0.0008 eV/Å to its whole-set 0.016 → unfittable frames do NOT explain
+  the rank-8 apax floor (their MAE share < 0.001); that floor is loss imbalance + optimisation.
+
+### 6.18 Long-distance dimers/trimers (data hygiene)
+- MAD dimers span 0.49–6.96 Å. **21 of the 2,500 (0.8%) contain an atom with no neighbour inside r_max = 5 Å**
+  (all 21: every pair beyond 5 Å). Their DFT forces are small but nonzero (max\|F\| median 0.23, max 0.51 eV/Å).
+- The model sees no neighbours → predicted force identically 0, energy = per-element shift only. Their force error
+  is irreducible and they feed unsatisfiable gradient every step. Example: FrPr at 5.88 Å, F = 0.117 eV/Å → it alone
+  produced the K = 19 "floor" (F MAE 0.039 on it, ≤ 1e-6 on all others).
+- 3.1% of all pair distances lie in 4.5–5.0 Å, where the cosine cutoff weight is ~0.006 at 4.75 Å: forces there are
+  only reproducible with very large coefficients — expect poor conditioning near the cutoff.
+- **Fix**: drop structures with any atom lacking a neighbour within r_max (or raise r_max beyond the data's range).
+  Possibly also down-weight pairs in the last ~0.5 Å before the cutoff.
+- Unexplained: AsFe at 2.0 Å (|F| 0.48) carried the K = 20 random-set error with |dE| = 0 and F MAE = |F|/3,
+  i.e. predicted force ≈ 0 despite being an ordinary neighbour pair. Not yet diagnosed.
+
+### 6.19 Per-element force/length scales from dimers
+Fit of all 31,325 MAD dimers with a Morse force F(d) = 2Da[e^{−2a(d−r0)} − e^{−a(d−r0)}], combining rules
+D_AB = √(D_A D_B), r0 = r_A + r_B, a_AB = (a_A+a_B)/2, robust soft-L1 least squares (`element_scales.py`,
+`element_scales.npz`). R² 0.83 on |F| < 20 eV/Å, median |resid| 0.69 eV/Å.
+- Strength ranking is chemical: N 16.9, O 14.3, Os 11.4, Re 11.0, C 10.6, W 10.0 eV … noble gases, Hg, alkalis ≈ 0.
+- Radii for strong binders 0.6–1.1 Å (≈ covalent for main group, below covalent for TMs); for D≈0 elements r, a
+  are unidentifiable (Cs, Fr nonsense) → needs a radius prior. Overall corr(r_fit, r_cov) ≈ 0.
+- Uses: per-element force-loss weighting (replacing the buggy sqrt(mean|F|) scale), a φ(Z) = (log D, r, a) prior
+  for the factorised embeddings, data-driven pair distance scaling.
+
+### 6.20 Output-activation saturation makes strongly bound structures unlearnable
+- Signature: specific structures with predicted force ≈ 0 (F MAE = |F|/3) stuck while everything else converges;
+  AsFe (K=20 random), HBr, CrThTi, AmPd (K=500). Not cutoff-related (all pairs < 4 Å) and not unusually compressed:
+  d / (r_cov,A + r_cov,B) = 1.00 (HBr), 0.80 (AsFe), 0.73 (AmPd), 0.62–0.96 (CrThTi) vs training-dimer
+  p5/median/p95 = 0.51/0.87/1.51. Common factor: moderately strongly bound pairs needing deep atomic energies.
+- Mechanism: `readout_activation: elu` saturates at −1 for negative inputs, bounding E_i ≳ shift − scale. Atoms
+  needing more negative energy are pushed into the flat region → zero gradient → zero force, no learning signal.
+- **Confirmed**: same K = 20 set with `readout_activation: identity` (bare loop, 50k steps cosine) fits exactly —
+  loss 1.8e-12, F MAE 2.1e-7 (elu: 1.2e-2, 8.1e-3, AsFe 0.16); AsFe no longer among the worst.
+- Barely visible in aggregate MAE (few structures) → explains why identity didn't move the apax 2.5k floor (§6.17),
+  but it is a correctness bug for strongly bound chemistry. Fix: identity output + repulsion term (ZBL/NLH) for
+  short-range stability, or a squashing that does not flatten (softplus-based, larger/learnable range).
+- **K = 500 (all pairs < 4 Å, nested, same 500), 50k steps cosine, elu vs identity output:**
+
+  | final | loss | E MAE | E max | F MAE | F max | F high-force | F low-force |
+  |---|---|---|---|---|---|---|---|
+  | elu | 0.018 | **0.045** | 0.70 | 0.0059 | 0.65 (stuck) | 0.0008 | 0.0069 |
+  | identity | **0.010** | 0.065 | 0.74 | **0.0047** | **0.11** | 0.0009 | **0.0055** |
+
+  Identity: no stuck structures (worst FNiSb 0.11 vs |F|/3 = 1.08, BaTm, LaNi — partially fitted, still improving),
+  F MAE −20%, F max 6× lower, loss ~halved; E MAE ~45% worse, and elu converges typical structures slightly faster
+  mid-run (step 30k: F 0.0088 vs 0.0105). Neither converged at 50k. Decision: go with identity output.
+- K = 50 (within 4 Å, identity output, identity transform): loss 3e-12, E MAE 6e-8, F MAE 3e-7 (fp32 limit); worst
+  are the extreme-force dimers (KSn 74, MnPr 69 eV/Å) at ~2e-6. Same K with covalent transform + NLH: spiky
+  (loss 1.6e-2 at 10k, best 7e-9) — run killed, revisit later (flat region below r0 is the same dead-gradient risk).
+
+### 6.21 Cutoff coverage of MAD gas-phase subsets and r_max 7 Å
+| subset | n | median atoms | largest pair (Å) | p50/p99 of per-structure max | any pair > 5 Å | isolated atom (no nbr < 5 Å) | max\|F\| on isolated atoms med/max |
+|---|---|---|---|---|---|---|---|
+| dimers | 31,325 | 2 | 6.96 (Fr₂) | 2.84/5.09 | 382 (1.2%) | 387 (1.2%) | 0.20/0.68 |
+| trimers | 2,306 | 3 | 6.16 (CdCsRa) | 3.62/5.43 | 72 (3.1%) | 3 (0.1%) | 0.40/0.53 |
+| trimers-extended | 92,278 | 3 | 11.64 | 4.07/7.82 | 22,885 (24.8%) | 1,345 (1.5%) | 0.23/0.75 |
+| mc3d_cluster | 6,920 | 5 | 9.91 | 4.44/7.22 | 2,213 (32.0%) | 1 (0.0%) | 0.00 |
+| shiftml_molfrags | 2,593 | 20 | 29.58 | 7.41/16.04 | 2,244 (86.5%) | 0 | – |
+
+- ~1,735 unfittable gas-phase structures (isolated atom, nonzero force) at r_max 5; ~25% of trimers-extended miss
+  ≥1 real interaction (energy bias too). Pairs > 5 Å in molfrags are harmless (covered by local neighbours).
+- Fr₂: equilibrium ≈ 4.9 Å (≈ r_max), well ~0.4 eV deep, still −0.215 eV/Å at 6.96 Å — r_max 5 sits on the bond
+  for heavy alkalis (Fr, Cs, Rb; likely Ra, Ba). (Fr's 7s is relativistically contracted, IE 4.07 > Cs 3.89 eV;
+  the issue is diffuseness/softness.)
+- **r_max 7 vs 5**, low-force 2.5k, rank 8, 100 epochs, bs32, 3 seeds: all-val E 1.125±0.084 vs 1.180±0.051,
+  F 0.461±0.007 vs 0.482±0.022 (~1σ, more seed-consistent); within-5 Å frames improve similarly; the ~6 frames/split
+  with a pair > 5 Å are noise (7 Å worse there). Same cost for clusters, r³ for bulk → not worth switching on this.
+- Per-element / pair-dependent cutoffs are physically fine: forces are −∇ of one translation-invariant total energy,
+  so Σ F_i = 0 exactly even with asymmetric neighbourhoods (Newton's 3rd law only breaks for hand-assigned per-atom
+  forces). Costs: NL at the max cutoff (matscipy `neighbour_list` accepts per-element-pair cutoff dicts), a smooth
+  per-pair cutoff function; cleanest is symmetric r_c(A,B) = f(r_A + r_B) (e.g. Morse radii, §6.19).
+
+### 6.22 Within-6 Å dimers + trimers + trimers-extended, 20k (identity output)
+Data: `mad_within_subset.py 20000 6` → `mad_dtte_within6_20000.traj`. Pool = MAD dimers + trimers + trimers-extended
+(125,909); keep frames with **all** pair distances ≤ 6 Å (116,736, 93%); random 20k (seed 0): 5,327 dimers,
+14,673 trimers, 102 elements, |F| p50/p90/max 2.7/47/100 eV/Å (no force filter — heavy tail kept).
+Model: rank 8, j0.1, 8 Bessel / 5 radial, r_max 7 Å (all pairs well inside), readout [64,32,16], bs32,
+cyclic cosine period 100, 18k/2k split (seed 1), 1 seed unless noted. Metrics: E MAE eV/structure, F eV/Å.
+
+| run | ep | train E | train F | val E | val F | val F MSE |
+|---|---|---|---|---|---|---|
+| elu output, 100 ep | 99 | 1.33 | 0.60 | 1.35 | 0.63 | 1.30 |
+| **identity output, 100 ep** | 99 | 1.21 | 0.55 | **1.23** | **0.57** | **1.07** |
+| identity, 1000 ep (single cosine), best-val ckpt | 277 | – | – | 0.79 | 0.44 | 0.77 |
+| identity, 1000 ep, final | 999 | 0.62 | 0.29 | 0.67 | 0.41 | 1.50 |
+
+- Identity beats elu on every metric at 20k (F MAE −9%, F MSE −18%, E −9%), consistent with §6.20.
+- 1000 epochs: typical-frame errors keep improving (val F MAE 0.57 → 0.41, E 1.23 → 0.67) but **val F MSE bottoms
+  at ep ~200–280 (0.77) and doubles by ep 999 (1.50)** while train F keeps falling (0.40 → 0.29): a few val frames
+  get much worse — tail memorisation / poor transfer of steep walls to rare pairs. apax keeps the best-val ckpt (ep 277).
+
+### 6.23 Capacity knobs at 20k, 100 epochs (identity, same data/split as §6.22, seed 1)
+| change | val F (ep 49 / 99) | val F MSE (ep 49 / 99) | val E (ep 99) | train F (ep 99) |
+|---|---|---|---|---|
+| baseline 8 basis / 5 radial, nn [64,32,16] | 0.63 / **0.57** | 1.32 / **1.07** | **1.23** | 0.55 |
+| n_basis 16 (5 radial) | 0.67 / 0.61 | 1.74 / 1.42 | 1.51 | 0.57 |
+| readout [64,64,64] | 0.64 / 0.58 | 1.37 / 1.11 | 1.33 | 0.55 |
+
+- Doubling the basis (max radial frequency ~3.6 → 7.2 Å⁻¹) makes things **worse**, train included. Confounded: the
+  core init is not scaled by 1/√n_basis, so the radial output (and the cubic/quartic descriptor) starts larger →
+  conditioning, not just capacity. Either way, basis resolution is not the bottleneck at 100 epochs.
+- Wider final readout layer changes nothing (≤3%, single seed). Width bounds how fast slopes can grow under Adam,
+  not their size (∂E/∂G is a single vector; magnitude = product of weight norms × activation slopes); bare-loop exact
+  fits with the same readout (§6.17/6.20) already rule out a representational ceiling.
+
+### 6.24 n_radial scan
+**2.5k** (`mad_within_subset.py 2500 6`, nested in the same shuffle; 2,250/250; 1000 ep single cosine, identity):
+patience 20 is meaningless here — early high-LR val noise stopped nr4/nr5 at ep 58/47 (best 38/27), nr3 ran to 231,
+so the ordering just tracked training length. With **patience 100** (best-val ckpt):
+
+| n_radial | stop / best ep | train F | val F | val F MSE | val E | features |
+|---|---|---|---|---|---|---|
+| 1 | 457 / 357 | 0.57 | 1.07 | 4.19 | 1.72 | 8 |
+| 2 | 295 / 195 | 0.62 | 0.95 | 3.02 | 1.81 | – |
+| 3 | 455 / 355 | 0.47 | **0.88** | 3.15 | **1.38** | 94 |
+| 4 | 382 / 282 | 0.52 | 0.89 | 3.40 | 1.58 | – |
+| 5 | 508 / 408 | 0.47 | 0.95 | 3.79 | 1.42 | 360 |
+
+**20k, 100 epochs** (seed also sets the split → seeds compare different val sets; compare within a seed):
+
+| | seed 1 | seed 2 | mean |
+|---|---|---|---|
+| val F, nr5 / nr3 | 0.575 / 0.608 | 0.650 / 0.662 | 0.612 / 0.635 (+4%) |
+| val F MSE, nr5 / nr3 | 1.07 / 1.26 | 1.55 / 1.47 | 1.31 / 1.36 |
+| val E, nr5 / nr3 | 1.23 / 1.32 | 1.56 / 1.56 | 1.39 / 1.44 |
+
+- Saturates by n_radial 2–3; even 1 channel is within ~20% at 2.5k. At 20k, 3 vs 5 costs 2–6% on force MAE
+  (paired), at ¼ of the descriptor (94 vs 360 features with n_contr 8). Seed/split spread (~13%) ≫ the gap.
+- Why "3 pairs per trimer ⇒ 3 radials" is not the argument: channels are evaluated on every pair, not one slot per
+  pair; a centre sees ≤2 pairs; geometrically even 1 monotone channel identifies (r₁, r₂, θ) via m0, contr1, contr2.
+  The real role of n_radial: the readout never sees Z, so a dimer's features trace a curve R^{AB}(r) ∈ ℝ^{n_radial}
+  that one shared readout maps to E_AB(r). With 1 channel all pairs are monotone reparametrisations of one shape
+  f (× per-element scale/shift); more channels = more distinct pair-curve families. So n_radial is the
+  species-information bottleneck, sized by the diversity of pair-curve shapes, not by pairs per structure.
+- Scope: dimers/trimers only; bulk (30–80 mixed neighbours) likely needs more.
+- **Pending**: 3 seeds × {3, 5} at 20k on a fixed split (`mad_dtte_within6_20k_{train,val}.traj`, 18k/2k,
+  permutation seed 0), so seed only changes init/order. Models `models/dtte6_20k_fixval_nr{3,5}_s{1,2,3}`.
+
+### 6.25 What limits fitting large forces (analysis; consistent with §6.17, 6.20, 6.22–6.24)
+1. Slope bound: |F| ≤ readout Jacobian norm × |∂G/∂r|. ∂G/∂r is bounded by the basis (8 Bessel over 7 Å ≈ 3.6 Å⁻¹ max
+   wavenumber) vs repulsive walls decaying over ~0.2–0.3 Å; large slopes need large weights that must also give
+   ~0 forces elsewhere (fights init scale, wd, Adam step size).
+2. Spectral bias: steep features are learned last, at small LR — the 1000-ep run fits the tail late by memorising.
+3. Scale normalisation: per-element force-RMS scaling puts 100 eV/Å at 30–50σ; MSE → these dominate the gradient
+   (~75%, §6.17); MAE/Huber → under-weighted. One set of weights spans two regimes ~40× apart.
+4. Data density × pair-specificity: walls are sparse in data, steepest in E, and pair-specific; rank-8 CP
+   shares across pairs → rare-pair walls are inferred from neighbours. Likely cause of the val-MSE blow-up (§6.22).
+5. Output saturation (removed: identity output). Hidden swish slope ≤ ~1.1 is fine.
+Implication: don't make the network produce the wall — a physics baseline (ZBL/NLH, or per-pair Morse with
+combining rules from §6.19) + NN residual; secondary: relative/robust force loss, more short-range data per pair.
+Capacity knobs (rank, basis, width, n_radial) have all been null.
+
+### 6.26 PES sensitivity to distant atoms (random-weight GMNN, fp64)
+Scripts `sensitivity/sens.py`, `sensitivity/shells.py`. Amorphous C at 1.7 g/cc by packmol (tolerance 1.3 Å, pbc):
+500 atoms (L 18.04 Å) and 2000 atoms (L 28.63 Å); default GMNN (r_c = 5 Å), random init, descriptor/readout fp64.
+Shapes held fixed (deletion = Z→0 + drop its pairs; NL padded) → one compile. Atom 0 = atom nearest the box centre.
+- **Energy**: smooth at r_c. Deleting the atom at 4.996 Å: |ΔE₀| 9e-16; deleting the 10 farthest (4.74–5.0 Å) 8e-7;
+  atoms outside r_c: exactly 0. Rattling far neighbours: ΔE₀ has no linear term (7e-13 at σ 0.01).
+- **Force (deletion)**: deleting any single atom within 2r_c shifts F₀ by 10–20% irrespective of its distance from
+  atom 0 (F₀ = −Σ_j ∂E_j/∂R₀; deleting k is a sharp change for k's own close neighbours). Deletion is a crude probe.
+- **Force (rattle, 2000 atoms, σ 0.05 Å, 10 seeds RMS, all atoms in the shell rattled)**: |ΔF₀|/|F₀| =
+  2.2e-1 (1–2 Å, 1 atom), 1.5e-1 (2–3), 4.0e-2 (3–4), 7.9e-3 (4–5), 1.8e-3 (5–6), 1.4e-3 (6–7), 4.7e-4 (7–8),
+  1.2e-4 (8–9), **2.6e-6 (9–10 Å, 103 atoms; 5.1e-7/5.7e-6 at σ 0.01/0.1 → linear)**, **0 for 10–11 Å**.
+  ~3–4× decay per Å beyond 3 Å; per atom the 9–10 Å shell is ~10⁶× weaker than the nearest neighbour.
+- Conclusion: at init there is no spurious long-range coupling. Open: does a *trained* model stay like this
+  (run `shells.py` on a trained checkpoint)?
+
+**Rattle-based augmentation (analysis, not run)**: label-free rattling doesn't help — copying F labels is wrong at
+first order (ΔF ≈ Hδ ≈ 0.3–0.5 eV/Å for C–C at δ 0.01 Å); copying E = Tikhonov (pulls F → 0); first-order E − F·δ
+labels are redundant with force training and carry a ½δᵀHδ error ~4 meV/atom at σ 0.01; penalising ΔF under
+rattle softens true curvature. Useful options: (1) locality prior — rattle only atoms in [r_c, 2r_c] of a centre and
+penalise that centre's ΔF (distance-weighted HVP penalty, ~2–3× step cost) — only if trained models show far coupling;
+(2) rattled structures with real labels, chosen by ensemble uncertainty; (3) repulsion prior (ZBL/NLH) for the region
+no data reaches; (4) denoising pretraining (Zaidi et al. 2022 / Noisy Nodes) — needs a noise head.
+
+### 6.27 Element priors: design (not yet implemented)
+Today the only prior is the small jitter (shrink to one shared radial); unseen elements get no gradient.
+- **A. Feature prior**: u(Z) = 1 + φ(Z)·A_u + δ_u(Z) (same for v). φ = ~20–40 fixed features (pymatgen: group, period,
+  block, valence counts, Pauling χ, r_cov, IE, EA; plus §6.19 Morse log D, r₀, a, masked for weak binders);
+  A learned (n_φ × rank); δ zero-init, own optimizer group with wd (like `pair_residual`). Unseen element → 1 + φA.
+- **B. Kernel prior**: Laplacian penalty λ Σ w(Z,Z′)‖u(Z) − u(Z′)‖², w = exp(−‖φ−φ′‖²/ℓ²) or periodic-table adjacency.
+  = GP prior with inverse-Laplacian covariance; unseen elements → weighted average of chemical neighbours. A with ridge
+  on δ ≡ GP with kernel φφᵀ + λ⁻¹I, so A (parametric) vs B (non-parametric) is a clean ablation.
+- **C. Physics directly** (targets the force tail, §6.25): C1 per-element Morse (D, r₀, a) with combining rules
+  (√(D_A D_B), r_A + r_B, mean a) as a learnable apax empirical term initialised from `element_scales.npz`;
+  NN learns the residual. C2 pair distance scaling r → r/(r_A + r_B) so one radial shape fits all walls (fits the
+  n_radial ≈ 1–3 finding; needs C1 as repulsion, like the covalent transform).
+- Evaluation: priors won't show on random val (all 102 elements seen). Need held-out elements (e.g. Li, Mg, Sc, Cu,
+  Ga, Se, Rh, Ba: drop all frames containing them) and a held-out group (halogens); tail via fixed-val F MSE.
+- Order: C1 → A + held-out split → B and C2.
+
 Critical review, body-order note, and prioritised next steps: `CRITIQUE.md`.
 
-## 7. Claims & status
+## 7. Parameter budget (species dependence of the radial function)
+| | (8 basis, 5 radial) | (12, 7) |
+|---|---|---|
+| dense pair table 119²·n_radial·n_basis | 566,440 | 1,189,524 |
+| CP rank 8: u, v (119×8 each) + core (n_basis × 8·n_radial) | 1,904 + 320 = **2,224** (255× fewer) | 1,904 + 672 = **2,576** (460× fewer) |
+| CP rank 64 | 15,232 + 2,560 = 17,792 | 15,232 + 5,376 = 20,608 |
+
+Only rows of elements present in the data are ever trained; at inference the CP table can be materialised for the
+present species at dense cost (§4.5).
+
+## 7b. Claims & status
 
 Supported (5 or 3 seeds, gap ≫ seed spread, dense given best-val checkpoint + wd scan):
 1. On sparse multi-element data a CP-factorised pair table generalises far better than a dense one, incl. unseen pairs.
@@ -601,8 +856,18 @@ Supported (5 or 3 seeds, gap ≫ seed spread, dense given best-val checkpoint + 
    common to all → loss weighting / force scaling / schedule are the suspects.
 10. High rank doesn't overfit (rank 128 at 2.5k beats rank 8; train floor 0.14 ≫ dense 0.016) — implicit low-rank bias.
 11. Hybrid CP + Δ needs strong decay under Adam (wd 10 ≳ rank 8; wd 0.1 memorises); rank 128 still best at 2.5k.
-12. **Not a universal win**: on ethanol (3 elements, data-rich) rank 8 j0.1 is ~36% worse on forces than dense, with
+12. **No capacity floor on clean data**: bare-loop exact fits up to K = 25; K = 500 to F MAE 0.006 (training).
+13. **elu output saturation makes strongly bound structures unlearnable** (zero force/gradient); identity fixes it.
+14. ~1.4% of MAD dimers/trimers(-extended) have an atom beyond r_max = 5 Å → unfittable; filter them.
+15. **Not a universal win**: on ethanol (3 elements, data-rich) rank 8 j0.1 is ~36% worse on forces than dense, with
     higher train error (underfitting). Small-jitter prior is dataset-dependent.
+
+16. Identity output also wins at scale (20k within-6 Å: F MAE −9%, F MSE −18% vs elu, 1 seed).
+17. More epochs improve typical frames but over-fit the force tail (val F MSE doubles after ep ~250 of 1000).
+18. Capacity knobs remain null at 20k: n_basis 16 worse (init-scale confounded), readout [64,64,64] ≈ [64,32,16].
+19. n_radial saturates at 2–3 on dimers/trimers (2.5k: 3 ≈ 4 ≈ 5; 20k: 3 within 2–6% of 5, 2 seeds; fixed-split
+    3-seed check pending) — ¼ the descriptor.
+20. Random-weight GMNN is smooth at the cutoff and force sensitivity decays ~3–4×/Å out to exactly 0 at 2r_c.
 
 Not yet shown:
 - Bulk/molecular environments (MAD `mc`, `binary_random`, …): many neighbours + angular terms.
@@ -620,6 +885,12 @@ Not yet shown:
 
 ## 8. Next steps
 See also `CRITIQUE.md` for the prioritised list.
+00. Finish fixed-split n_radial 3 vs 5 (3 seeds); per-frame breakdown of the val F MSE outliers in the 1000-ep run
+    (max |F|, pair, pair seen in train?) → decides C1.
+00b. C1 Morse baseline (§6.27), then φ(Z) prior + held-out-element/group splits; `shells.py` on a trained model.
+0a. Confirm saturation at K = 500 with identity output; switch default output activation (identity + repulsion).
+0b. apax confirmation run: filter isolated-atom frames, Huber on E and F, identity output, larger batch, longer
+    annealed schedule → must beat current val (0.58 seen / 0.90 unseen) on held-out data.
 0. Hybrid at 20k (rank 8 / rank 128 + Δ wd 10); hybrid on ethanol; longer schedule on ethanol (prior vs steps).
 1. Longer schedule (600 ep) rank 8 vs 32, 2 seeds.
 2. Add bulk subsets; learning curve 5k/20k/50k (needs CUDA jaxlib).
@@ -642,8 +913,16 @@ See also `CRITIQUE.md` for the prioritised list.
   `config_mad5k_r8j{0.01,0.1,0.316}_s*.yaml`; `config_mad{2k5,5k}_*nc4_s*.yaml`;
   `config_mad5k_r8j0.1{centre,nbr}_s*.yaml`; `config_mad{10k,20k,5kbs8}_*.yaml`
 - Launchers: `run_mad5k.sh` (8×2-core queue), `run_wd.sh`
+- Floor/capacity tools: `overfit_one.py`, `overfit_k.py` (share/unique modes), `overfit_sweep.py` (padded vmap,
+  `--within<d>`, `--identity`, `detail`), `grad_probe.py`, `element_scales.py`, `eval_lowF.py`, `eval_rc.py`;
+  data `mad_dimtri_lowF20_2500.traj` (`mad_lowforce_subset.py`), `ncurve/`.
 - Eval: `core_rank.py` (SV spectra), `eval_fbins.py` (force-bin), `eval_mad5k.py` (5-seed seen/unseen), `eval_wd_s1.py [models…]` (seed-1 split incl. train),
   `eval_multi.py seeds models…` (generic, own split per model)
+- Within-d subsets: `mad_within_subset.py N DMAX` → `mad_dtte_within6_{2500,20000}.traj` (+ fixed split
+  `mad_dtte_within6_20k_{train,val}.traj`); configs `config_dtte6_*.yaml` (§6.22–6.24).
+- GPU moment benchmark: `moment_speedups_bench.py N` (§4.6).
+- Sensitivity: `sensitivity/sens.py` (`500` arg = 500-atom box), `sensitivity/shells.py`, packmol inputs
+  `sensitivity/pack.inp`, `sensitivity/pack500.inp`, `sensitivity/C.xyz` (§6.26).
 - Models: `models/ab_fr_*`, `models/mad_*`, `models/mad5k_*`
 - Code (branch `factorized-radial` in ~/apax): `FactorizedRadialFunction` in
   `apax/layers/descriptor/basis_functions.py`; `radial_rank`, `radial_emb_jitter` in `apax/config/model_config.py`;
