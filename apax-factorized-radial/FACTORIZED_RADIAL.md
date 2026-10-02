@@ -773,8 +773,17 @@ so the ordering just tracked training length. With **patience 100** (best-val ck
   f (× per-element scale/shift); more channels = more distinct pair-curve families. So n_radial is the
   species-information bottleneck, sized by the diversity of pair-curve shapes, not by pairs per structure.
 - Scope: dimers/trimers only; bulk (30–80 mixed neighbours) likely needs more.
-- **Pending**: 3 seeds × {3, 5} at 20k on a fixed split (`mad_dtte_within6_20k_{train,val}.traj`, 18k/2k,
-  permutation seed 0), so seed only changes init/order. Models `models/dtte6_20k_fixval_nr{3,5}_s{1,2,3}`.
+- **Fixed split, 3 seeds** (`mad_dtte_within6_20k_{train,val}.traj`, 18k/2k, permutation seed 0; seed changes only
+  init/order; 100 ep; models `models/dtte6_20k_fixval_nr{3,5}_s{1,2,3}`), mean ± std:
+
+  | n_radial | train F | val E | val F | val F MSE |
+  |---|---|---|---|---|
+  | 3 | 0.590 ± 0.005 | 1.41 ± 0.07 | 0.639 ± 0.008 | 1.44 ± 0.09 |
+  | 5 | 0.575 ± 0.032 | 1.40 ± 0.14 | 0.632 ± 0.027 | 1.44 ± 0.11 |
+  | paired 3 − 5 | +0.015 ± 0.028 | +0.004 ± 0.125 | **+0.006 ± 0.019 (+1%)** | +0.008 ± 0.078 |
+
+  **n_radial 3 ≡ 5 at 20k within seed noise** (per-seed val F gap +4.7%, −1.4%, +0.1%); 3 is also more
+  seed-stable. The earlier random-split 2-seed gap (+4%) was split noise.
 
 ### 6.25 What limits fitting large forces (analysis; consistent with §6.17, 6.20, 6.22–6.24)
 1. Slope bound: |F| ≤ readout Jacobian norm × |∂G/∂r|. ∂G/∂r is bounded by the basis (8 Bessel over 7 Å ≈ 3.6 Å⁻¹ max
@@ -865,8 +874,8 @@ Supported (5 or 3 seeds, gap ≫ seed spread, dense given best-val checkpoint + 
 16. Identity output also wins at scale (20k within-6 Å: F MAE −9%, F MSE −18% vs elu, 1 seed).
 17. More epochs improve typical frames but over-fit the force tail (val F MSE doubles after ep ~250 of 1000).
 18. Capacity knobs remain null at 20k: n_basis 16 worse (init-scale confounded), readout [64,64,64] ≈ [64,32,16].
-19. n_radial saturates at 2–3 on dimers/trimers (2.5k: 3 ≈ 4 ≈ 5; 20k: 3 within 2–6% of 5, 2 seeds; fixed-split
-    3-seed check pending) — ¼ the descriptor.
+19. n_radial saturates at 2–3 on dimers/trimers (2.5k: 3 ≈ 4 ≈ 5; 20k fixed split, 3 seeds: 3 ≡ 5, paired val F
+    +1% ± 3%) — ¼ the descriptor.
 20. Random-weight GMNN is smooth at the cutoff and force sensitivity decays ~3–4×/Å out to exactly 0 at 2r_c.
 
 Not yet shown:
@@ -885,7 +894,7 @@ Not yet shown:
 
 ## 8. Next steps
 See also `CRITIQUE.md` for the prioritised list.
-00. Finish fixed-split n_radial 3 vs 5 (3 seeds); per-frame breakdown of the val F MSE outliers in the 1000-ep run
+00. Per-frame breakdown of the val F MSE outliers in the 1000-ep run
     (max |F|, pair, pair seen in train?) → decides C1.
 00b. C1 Morse baseline (§6.27), then φ(Z) prior + held-out-element/group splits; `shells.py` on a trained model.
 0a. Confirm saturation at K = 500 with identity output; switch default output activation (identity + repulsion).
@@ -918,6 +927,7 @@ See also `CRITIQUE.md` for the prioritised list.
   data `mad_dimtri_lowF20_2500.traj` (`mad_lowforce_subset.py`), `ncurve/`.
 - Eval: `core_rank.py` (SV spectra), `eval_fbins.py` (force-bin), `eval_mad5k.py` (5-seed seen/unseen), `eval_wd_s1.py [models…]` (seed-1 split incl. train),
   `eval_multi.py seeds models…` (generic, own split per model)
+- Bulk subset: `mad_bulk_subset.py N` → `mad_bulk_2500.traj` (mc3d 1314 / rattled 1107 / random 79; stress only on rattled).
 - Within-d subsets: `mad_within_subset.py N DMAX` → `mad_dtte_within6_{2500,20000}.traj` (+ fixed split
   `mad_dtte_within6_20k_{train,val}.traj`); configs `config_dtte6_*.yaml` (§6.22–6.24).
 - GPU moment benchmark: `moment_speedups_bench.py N` (§4.6).
