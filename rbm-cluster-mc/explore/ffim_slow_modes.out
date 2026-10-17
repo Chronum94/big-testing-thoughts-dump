@@ -1,0 +1,6 @@
+T=0.5 metropolis tau S00=   47.8 S0pi=   46.1 E=   11.6  ms= 1.57  max-tau*ms=    75.2  <S00>=37.17 <S0pi>=36.56 <E>/N=-0.9983
+T=0.5 KBD        tau S00=  310.5 S0pi=  721.7 E=  158.5  ms= 0.34  max-tau*ms=   248.1  <S00>=26.55 <S0pi>=48.60 <E>/N=-0.9985
+T=0.5 sweep+KBD  tau S00=    1.1 S0pi=    1.1 E=    2.8  ms= 1.93  max-tau*ms=     5.4  <S00>=36.32 <S0pi>=36.28 <E>/N=-0.9982
+T=0.3 metropolis tau S00=   61.9 S0pi=   58.6 E=    nan  ms= 1.57  max-tau*ms=    97.1  <S00>=37.73 <S0pi>=36.86 <E>/N=-1.0000
+T=0.3 KBD        tau S00=    0.5 S0pi=    0.5 E=    0.5  ms= 0.34  max-tau*ms=     0.2  <S00>=26.95 <S0pi>=25.34 <E>/N=-0.9687
+T=0.3 sweep+KBD  tau S00=    1.0 S0pi=    1.0 E=    3.2  ms= 1.93  max-tau*ms=     6.3  <S00>=37.08 <S0pi>=37.28 <E>/N=-1.0000

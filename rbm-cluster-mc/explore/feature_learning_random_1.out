@@ -1,0 +1,18 @@
+reference ESJD: KBD=3.229  all-off=1.429
+it   1  ESJD(theta)=1.379  mean f=1.422
+it   5  ESJD(theta)=0.793  mean f=1.525
+it  10  ESJD(theta)=0.971  mean f=1.803
+it  15  ESJD(theta)=0.884  mean f=1.389
+it  20  ESJD(theta)=0.534  mean f=1.406
+it  25  ESJD(theta)=0.605  mean f=1.202
+it  30  ESJD(theta)=0.578  mean f=1.357
+it  35  ESJD(theta)=1.381  mean f=1.358
+it  40  ESJD(theta)=1.045  mean f=1.013
+
+learned activations p(h=1|F) for frustrated types (FFIM has only frustrated plaquettes):
+  pair0/sub0/frus    W=  1.67 b= -2.52  p(F=-2)=0.003  p(F=+0)=0.074  p(F=+2)=0.694
+  pair0/sub1/frus    W=  0.19 b= -1.42  p(F=-2)=0.141  p(F=+0)=0.195  p(F=+2)=0.262
+  pair1/sub0/frus    W=  0.80 b=  0.19  p(F=-2)=0.197  p(F=+0)=0.548  p(F=+2)=0.857
+  pair1/sub1/frus    W= -0.53 b= -3.18  p(F=-2)=0.108  p(F=+0)=0.040  p(F=+2)=0.014
+  plaq/sub0/frus     W=  0.57 b= -2.90  p(F=-2)=0.017  p(F=+2)=0.147
+  plaq/sub1/frus     W=  0.02 b= -3.89  p(F=-2)=0.019  p(F=+2)=0.021

@@ -1,0 +1,10 @@
+L= 8 lam=0.50  tau_|m| =    28.3 +-   4.9  acc=1.000  <changed>/N=0.05
+L= 8 lam=0.80  tau_|m| =    15.9 +-   1.0  acc=1.000  <changed>/N=0.07
+L= 8 lam=0.90  tau_|m| =     8.5 +-   0.9  acc=1.000  <changed>/N=0.07
+L= 8 lam=0.95  tau_|m| =     4.6 +-   0.2  acc=1.000  <changed>/N=0.09
+L= 8 lam=1.00  tau_|m| =     2.4 +-   0.1  acc=1.000  <changed>/N=0.50
+L=16 lam=0.50  tau_|m| =    56.7 +-   2.7  acc=1.000  <changed>/N=0.06
+L=16 lam=0.80  tau_|m| =    61.9 +-   4.0  acc=1.000  <changed>/N=0.07
+L=16 lam=0.90  tau_|m| =    33.4 +-   2.9  acc=1.000  <changed>/N=0.08
+L=16 lam=0.95  tau_|m| =    17.7 +-   0.6  acc=1.000  <changed>/N=0.09
+L=16 lam=1.00  tau_|m| =     2.9 +-   0.1  acc=1.000  <changed>/N=0.50

@@ -1,0 +1,7 @@
+glass b= -30  tau_E=  339.0 (per-run [158.2 434.5 545.9 217.3])  acc=1.000  changed/N=0.502  ms=0.14
+glass b=  -3  tau_E=  421.4 (per-run [158.2 434.5 545.9 547. ])  acc=1.000  changed/N=0.498  ms=0.15
+glass b=  -1  tau_E=  291.2 (per-run [467.3 461.4  37.2 198.9])  acc=1.000  changed/N=0.505  ms=0.18
+glass b=   0  tau_E=  262.4 (per-run [ 60.9 482.  491.   15.9])  acc=1.000  changed/N=0.499  ms=0.14
+glass b=   1  tau_E=  339.0 (per-run [367.  643.3 155.8 190. ])  acc=1.000  changed/N=0.502  ms=0.16
+glass b=   3  tau_E=  605.1 (per-run [688.7 519.  528.8 683.8])  acc=1.000  changed/N=0.502  ms=0.15
+glass b=  30  tau_E=    inf (per-run [inf inf inf inf])  acc=1.000  changed/N=0.497  ms=0.14

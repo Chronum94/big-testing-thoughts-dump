@@ -1,0 +1,14 @@
+0 PCD {'sd_data': 6.277, 'sd_prop': 5.526, 'dshift': -4.162, 'mv_full': 0.268, 'mv_blk2': 0.267}
+0 PCD+Var(data) {'sd_data': 2.234, 'sd_prop': 4.327, 'dshift': -6.571, 'mv_full': 0.072, 'mv_blk2': 0.244}
+0 PCD+Var(data+prop) {'sd_data': 2.68, 'sd_prop': 3.008, 'dshift': -4.076, 'mv_full': 0.209, 'mv_blk2': 0.286}
+1 PCD {'sd_data': 6.619, 'sd_prop': 4.481, 'dshift': -5.217, 'mv_full': 0.111, 'mv_blk2': 0.209}
+1 PCD+Var(data) {'sd_data': 2.539, 'sd_prop': 4.704, 'dshift': -7.275, 'mv_full': 0.106, 'mv_blk2': 0.172}
+1 PCD+Var(data+prop) {'sd_data': 3.596, 'sd_prop': 3.17, 'dshift': -5.048, 'mv_full': 0.171, 'mv_blk2': 0.284}
+2 PCD {'sd_data': 4.941, 'sd_prop': 4.698, 'dshift': -4.557, 'mv_full': 0.133, 'mv_blk2': 0.225}
+2 PCD+Var(data) {'sd_data': 2.172, 'sd_prop': 4.262, 'dshift': -6.252, 'mv_full': 0.107, 'mv_blk2': 0.214}
+2 PCD+Var(data+prop) {'sd_data': 2.871, 'sd_prop': 2.668, 'dshift': -3.874, 'mv_full': 0.16, 'mv_blk2': 0.202}
+
+2D L=6 q=3 T=1.0: mean ± std over seeds [0, 1, 2]
+PCD                  sd_data=5.946±0.724  sd_prop=4.902±0.451  dshift=-4.646±0.435  mv_full=0.171±0.069  mv_blk2=0.234±0.024
+PCD+Var(data)        sd_data=2.315±0.160  sd_prop=4.431±0.195  dshift=-6.699±0.427  mv_full=0.095±0.016  mv_blk2=0.210±0.030
+PCD+Var(data+prop)   sd_data=3.049±0.394  sd_prop=2.949±0.209  dshift=-4.333±0.513  mv_full=0.180±0.021  mv_blk2=0.258±0.039

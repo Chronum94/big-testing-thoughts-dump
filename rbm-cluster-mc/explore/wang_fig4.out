@@ -1,0 +1,4 @@
+W = arccosh(e^(2 beta K)) = 0.5814, beta J = 0.4007
+L= 8  local: tau_E=    7.9 ms=  0.65 binder=1.164   cluster: tau_E=    3.6 ms=  0.21 binder=1.162 AF-links=0.025
+L=16  local: tau_E=   21.0 ms=  2.73 binder=1.154   cluster: tau_E=    4.9 ms=  0.36 binder=1.177 AF-links=0.026
+L=32  local: tau_E=  127.2 ms=  9.47 binder=1.273   cluster: tau_E=    6.0 ms=  0.86 binder=1.150 AF-links=0.026

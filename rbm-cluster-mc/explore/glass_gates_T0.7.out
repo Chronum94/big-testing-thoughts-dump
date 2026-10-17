@@ -1,0 +1,7 @@
+metropolis               tau_E=   15.6  tau_spin=   78.2  ms/step=1.12  tau_spin*ms=    95.0
+uniform lam=0.0          tau_E=  192.0  tau_spin=  150.5  ms/step=0.26  tau_spin*ms=    37.8
+uniform lam=0.5          tau_E=  322.6  tau_spin=  136.1  ms/step=0.46  tau_spin*ms=    60.1
+uniform lam=0.8          tau_E=  351.1  tau_spin=  221.8  ms/step=0.38  tau_spin*ms=    81.2
+uniform lam=1.0          tau_E=  400.5  tau_spin=    0.5  ms/step=0.33  tau_spin*ms=     0.2
+frus-aware lam_f=0.0     tau_E=  231.3  tau_spin=  178.1  ms/step=0.36  tau_spin*ms=    65.5
+frus-aware lam_f=0.5     tau_E=  219.7  tau_spin=  202.5  ms/step=0.42  tau_spin*ms=    86.5

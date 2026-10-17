@@ -1,0 +1,11 @@
+reference KBD (1,0,0)      ESJD=3.867 acc=1.000
+reference SW (0,0,1)       ESJD=1.949 acc=1.000
+reference split (.5,.5,0)  ESJD=1.421 acc=1.000
+reference metropolis only  ESJD=1.180 acc=0.000
+it   1 shares(sub0,sub1,link)=(0.38,0.40,0.21) b=(-0.6,0.5,-2.9) ESJD=1.949 acc=1.000
+it   5 shares(sub0,sub1,link)=(0.55,0.32,0.13) b=(-0.4,0.2,-2.7) ESJD=1.949 acc=1.000
+it  10 shares(sub0,sub1,link)=(0.54,0.39,0.07) b=(-0.3,0.5,-3.2) ESJD=1.963 acc=1.000
+it  15 shares(sub0,sub1,link)=(0.58,0.34,0.07) b=(-0.7,0.4,-3.4) ESJD=1.963 acc=1.000
+it  20 shares(sub0,sub1,link)=(0.54,0.42,0.04) b=(-0.7,0.5,-3.6) ESJD=1.553 acc=1.000
+it  25 shares(sub0,sub1,link)=(0.53,0.43,0.04) b=(-1.1,0.4,-3.7) ESJD=1.549 acc=1.000
+it  30 shares(sub0,sub1,link)=(0.72,0.25,0.04) b=(-1.0,0.4,-3.9) ESJD=1.523 acc=1.000
