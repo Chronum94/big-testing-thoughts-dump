@@ -43,14 +43,16 @@ for ax, k, name in ((axes[0], 3, "val force MAE (meV/Å)"), (axes[1], 4, "val en
         p = [q for q in pts if q[2] == fam]
         ax.scatter([q[1] for q in p], [q[k] for q in p], c=c, marker=m, s=60, label=fam, zorder=3,
                    edgecolors="white", linewidths=1.5)
-    front, best = [], float("inf")
-    for q in sorted(pts, key=lambda q: q[1]):
-        if q[k] < best:
-            best = q[k]; front.append(q)
-    ax.step([q[1] for q in front], [q[k] for q in front], where="post", c="k", lw=1, alpha=0.4, zorder=1,
-            label="Pareto front")
+    hull = []  # lower convex hull (monotone chain), cut at the most accurate point: the convex Pareto front
+    for q in sorted(pts, key=lambda q: (q[1], q[k])):
+        while len(hull) >= 2 and ((hull[-1][1] - hull[-2][1]) * (q[k] - hull[-2][k])
+                                  - (hull[-1][k] - hull[-2][k]) * (q[1] - hull[-2][1])) <= 0:
+            hull.pop()
+        hull.append(q)
+    hull = hull[:min(range(len(hull)), key=lambda i: hull[i][k]) + 1]
+    ax.plot([q[1] for q in hull], [q[k] for q in hull], c="k", lw=1, alpha=0.5, zorder=1, label="convex Pareto front")
     for q in pts:
-        ax.annotate(q[0], (q[1], q[k]), xytext={"L3 A32": (6, 6), "L3 A24": (-48, -12), "B5": (-22, -12), "A16 B5": (6, 6)}.get(q[0], (6, 4)), textcoords="offset points", fontsize=8, color="#333")
+        ax.annotate(q[0], (q[1], q[k]), xytext={"L3 A32": (6, 6), "L3 A24": (-48, -12), "B5": (2, -14), "A16 B5": (6, 6)}.get(q[0], (6, 4)), textcoords="offset points", fontsize=8, color="#333")
     ref = next(q for q in pts if q[0].startswith("L0"))
     ax.axhline(ref[k], c="#1f5fa8", lw=0.8, ls=":", alpha=0.6)
     ax.axvline(ref[1], c="#1f5fa8", lw=0.8, ls=":", alpha=0.6)

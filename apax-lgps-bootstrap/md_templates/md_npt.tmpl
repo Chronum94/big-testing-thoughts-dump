@@ -1,0 +1,18 @@
+seed: 1
+ensemble:
+  name: npt
+  dt: 2.0
+  temperature_schedule: {name: constant, T0: TEMP}
+  thermostat_chain: {chain_length: 3, chain_steps: 2, tau: 100}
+  pressure: 1.01325
+  barostat_chain: {chain_length: 3, chain_steps: 2, tau: 1000}
+duration: DUR
+n_inner: 500
+sampling_rate: SAMP
+buffer_size: 100
+dr_threshold: 0.5
+extra_capacity: 16
+initial_structure: /home/chronum/scratch/lgps/lgps_start.extxyz
+sim_dir: /home/chronum/scratch/lgps/md/MODEL_npt_TEMP
+traj_name: md.h5
+checkpoint_interval: 100000

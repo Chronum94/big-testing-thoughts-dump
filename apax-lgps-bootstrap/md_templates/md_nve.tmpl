@@ -1,0 +1,15 @@
+seed: 1
+ensemble:
+  name: nve
+  dt: 0.5
+  temperature_schedule: {name: constant, T0: 600}
+duration: 20000
+n_inner: 500
+sampling_rate: 20
+buffer_size: 100
+dr_threshold: 0.5
+extra_capacity: 16
+initial_structure: /home/chronum/scratch/lgps/lgps_start.extxyz
+sim_dir: /home/chronum/scratch/lgps/md/MODEL_nve600
+traj_name: md.h5
+checkpoint_interval: 20000

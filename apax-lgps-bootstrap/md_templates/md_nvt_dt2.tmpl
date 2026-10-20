@@ -1,0 +1,16 @@
+seed: 1
+ensemble:
+  name: nvt
+  dt: 2.0
+  temperature_schedule: {name: constant, T0: TEMP}
+  thermostat_chain: {chain_length: 3, chain_steps: 2, tau: 100}
+duration: 100000
+n_inner: 500
+sampling_rate: 25
+buffer_size: 100
+dr_threshold: 0.5
+extra_capacity: 16
+initial_structure: /home/chronum/scratch/lgps/lgps_start.extxyz
+sim_dir: /home/chronum/scratch/lgps/md/MODEL_dt2_nvtTEMP
+traj_name: md.h5
+checkpoint_interval: 50000
