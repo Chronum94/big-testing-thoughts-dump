@@ -1,0 +1,35 @@
+diff --git a/apax/train/loss.py b/apax/train/loss.py
+index ebefa316..de8dc373 100644
+--- a/apax/train/loss.py
++++ b/apax/train/loss.py
+@@ -45,6 +45,22 @@ def weighted_huber_loss(
+     return loss
+ 
+ 
++def relative_squared_error(
++    label: jnp.array,
++    prediction: jnp.array,
++    name: str,
++    parameters: dict = {},
++    inputs: dict = {},
++) -> jnp.array:
++    """Squared error relative to the per-atom reference magnitude:
++    ((pred - label) / (eps + |label_atom|))^2, eps (default 0.1, in the property's units) keeps
++    small-force atoms from dominating. Padded atoms have zero label and prediction, so they add 0."""
++    label, prediction = label[name], prediction[name]
++    eps = parameters.get("eps", 0.1)
++    norm = jnp.linalg.norm(label, axis=-1, keepdims=True)
++    return ((label - prediction) / (eps + norm)) ** 2
++
++
+ def _floored_sigma(sigmas, parameters):
+     """sqrt(sigma^2 + eps^2): a smooth floor (default eps 1e-6, in the units of the
+     quantity). A hard clip has zero gradient below the floor."""
+@@ -282,6 +298,7 @@ nll_3x3.uses_spread = True
+ loss_functions = {
+     "mse": weighted_squared_error,
+     "huber": weighted_huber_loss,
++    "relative_mse": relative_squared_error,
+     "cosine_sim": force_angle_loss,
+     "cosine_sim_div_magnitude": force_angle_div_force_label,
+     "cosine_sim_exp_magnitude": force_angle_exponential_weight,

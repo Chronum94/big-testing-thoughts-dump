@@ -1,0 +1,12 @@
+
+lgB5_s1_ema90_scan: |dF| mean 81.2 meV/A, median rel 0.086
+  per element |dF| (meV/A): {np.str_('Ge'): 131.9, np.str_('Li'): 58.4, np.str_('P'): 138.8, np.str_('S'): 86.5}
+  per bin |dF| (meV/A): [56.9, 62.1, 65.7, 70.2, 76.9, 82.1, 85.2, 92.9, 101.0, 119.4]
+
+lgB5_s1_scan_huber: |dF| mean 80.7 meV/A, median rel 0.085
+  per element |dF| (meV/A): {np.str_('Ge'): 149.6, np.str_('Li'): 54.3, np.str_('P'): 141.8, np.str_('S'): 86.8}
+  per bin |dF| (meV/A): [54.4, 59.2, 62.8, 67.6, 74.7, 81.0, 86.5, 93.9, 103.0, 123.9]
+
+lgB5_s1_scan_rel: |dF| mean 81.8 meV/A, median rel 0.084
+  per element |dF| (meV/A): {np.str_('Ge'): 138.5, np.str_('Li'): 51.9, np.str_('P'): 145.9, np.str_('S'): 91.2}
+  per bin |dF| (meV/A): [52.2, 57.3, 61.1, 67.6, 74.4, 83.0, 88.2, 96.8, 107.7, 129.2]
