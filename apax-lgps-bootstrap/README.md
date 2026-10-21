@@ -77,6 +77,21 @@ Can a small, MD-free bootstrap set, labelled by a foundation model, train an apa
 
 Thermal frames are 2–3× harder than near-equilibrium bootstrap frames, but energies stay at about 1 meV/atom.
 
+**Force error by element** (lgB5_s1; `scripts/eval_elements.py`; values read off the plot):
+
+| element | teacher MD 600 / 900 K (meV/Å) | relative to mean \|F\| |
+|---|---|---|
+| Li | 25 / 34 | 9.5 / 10.4 % |
+| Ge | 58 / 87 | 7.9 / 10.2 % |
+| P | 61 / 81 | 6.7 / 7.4 % |
+| S | 38 / 51 | 7.2 / 7.9 % |
+
+- **Absolute errors** are highest on the stiff Ge and P.
+- **Relative to their own forces,** every element sits at 7–10 %, and Li is no worse than the framework. Superionic water shows the same thing: errors scale with |F|.
+- **Bootstrap val frames:** the rattle-and-volume block dominates the absolute errors, while the Li-disorder block has the highest relative error for Ge, P and S.
+
+![error by element](figs/err_by_element.png)
+
 ## MD (apax jax-md, 2×2×2 cell, 400 atoms, lowest ordering, fixed 0 K volume unless stated)
 
 **Stability:**
@@ -135,7 +150,7 @@ Thermal frames are 2–3× harder than near-equilibrium bootstrap frames, but en
   - structure and ordering: `sites.py`, `order.py`, `relax.py`;
   - bootstrap and teacher test MD: `gen_boot.py`, `md_teacher.py`;
   - split and plots: `split.py`, `show_cell.py`, `plot_loss.py`;
-  - evaluation and MD analysis: `eval_test.py` + `cpuload.py`, `analyze_md.py`, `analyze_npt.py`, `plot_arrhenius.py`, `plot_aniso.py`;
+  - evaluation and MD analysis: `eval_test.py` + `cpuload.py`, `eval_elements.py`, `analyze_md.py`, `analyze_npt.py`, `plot_arrhenius.py`, `plot_aniso.py`;
   - GPU queues: `boot.sh`, `queue*.sh`;
   - apax MD in the container: `md.sh` + `rocm_argsort_patch.py`.
 - **`configs/`:** training configs. `lgB5_s1_ema99` was queued but not run yet.

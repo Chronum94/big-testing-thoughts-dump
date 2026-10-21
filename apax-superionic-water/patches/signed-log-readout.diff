@@ -1,0 +1,98 @@
+diff --git a/apax/config/model_config.py b/apax/config/model_config.py
+index 48c8c810..56f78273 100644
+--- a/apax/config/model_config.py
++++ b/apax/config/model_config.py
+@@ -246,10 +246,15 @@ class BaseModelConfig(BaseModel, extra="forbid"):
+     use_bias : bool, default = False
+         Whether the readout layers have biases. Without biases an atom with no
+         neighbours gets exactly its isolated-atom energy shift.
+-    readout_activation : Literal["identity", "swish", "elu"], default = "elu"
++    readout_activation : Literal["identity", "swish", "elu", "asinh"], default = "elu"
+         Activation applied to the readout output before the per-element scale.
+         All options are 0 at 0. `"elu"` is unbounded above and keeps the scale
+-        small when isolated-atom energy shifts are used.
++        small when isolated-atom energy shifts are used. `"elu"` is bounded below by -1,
++        so an energy that must sit more than one scale unit below the shift drives the
++        output into saturation (zero gradient); `"asinh"` is unbounded both ways.
++    zero_init_output : bool, default = False
++        Initialise the readout's output layer to zero, so training starts from the
++        per-element shift (gradients still reach the hidden layers through it).
+     ensemble : Optional[EnsembleConfig], default = None
+         What kind of model ensemble to use (optional).
+     property_heads : list[PropertyHead], default = []
+@@ -278,7 +283,8 @@ class BaseModelConfig(BaseModel, extra="forbid"):
+     activation_fn: str = "variance_preserving_swish"
+     use_ntk: bool = False
+     use_bias: bool = False
+-    readout_activation: Literal["identity", "swish", "elu"] = "elu"
++    readout_activation: Literal["identity", "swish", "elu", "asinh"] = "elu"
++    zero_init_output: bool = False
+ 
+     ensemble: Optional[EnsembleConfig] = None
+ 
+diff --git a/apax/layers/ntk_linear.py b/apax/layers/ntk_linear.py
+index c56d1a91..426e583f 100644
+--- a/apax/layers/ntk_linear.py
++++ b/apax/layers/ntk_linear.py
+@@ -27,6 +27,8 @@ class NTKLinear(nn.Module):
+             w_initializer = nn.initializers.normal(1.0, dtype=dtype)
+         elif self.w_init == "lecun":
+             w_initializer = nn.initializers.lecun_normal(dtype=dtype)
++        elif self.w_init == "zeros":
++            w_initializer = nn.initializers.zeros
+         else:
+             raise ValueError(f"Unknown weight initializer: {self.w_init}.")
+ 
+diff --git a/apax/layers/readout.py b/apax/layers/readout.py
+index 342a487a..512d08e1 100644
+--- a/apax/layers/readout.py
++++ b/apax/layers/readout.py
+@@ -13,6 +13,8 @@ OUTPUT_ACTIVATIONS = {
+     "swish": swish,
+     # 0 at 0, -> x for large x, saturate gently to -1 for large negative x
+     "elu": elu,
++    # smooth signed log (~ sign(x) log(2|x|)): unbounded both ways, slope 1/sqrt(1 + x^2) is 1 at 0 and never 0
++    "asinh": jnp.arcsinh,
+ }
+ 
+ 
+@@ -26,6 +28,7 @@ class AtomisticReadout(nn.Module):
+     n_shallow_ensemble: int = 0
+     is_feature_fn: bool = False
+     output_activation: str = "elu"
++    zero_init_output: bool = False
+     dtype: Any = jnp.float32
+ 
+     def setup(self):
+@@ -40,9 +43,10 @@ class AtomisticReadout(nn.Module):
+ 
+         dense = []
+         for ii, n_hidden in enumerate(units):
++            is_output = not self.is_feature_fn and ii == len(units) - 1
+             layer = NTKLinear(
+                 n_hidden,
+-                w_init=self.w_init,
++                w_init="zeros" if is_output and self.zero_init_output else self.w_init,
+                 b_init=self.b_init,
+                 use_ntk=self.use_ntk,
+                 use_bias=self.use_bias,
+diff --git a/apax/nn/builder.py b/apax/nn/builder.py
+index f42f1f2d..f3d7fbdc 100644
+--- a/apax/nn/builder.py
++++ b/apax/nn/builder.py
+@@ -176,6 +176,7 @@ class ModelBuilder:
+             use_ntk=head_config["use_ntk"],
+             use_bias=head_config.get("use_bias", False),
+             output_activation=head_config.get("readout_activation", "elu"),
++            zero_init_output=head_config.get("zero_init_output", False),
+             is_feature_fn=is_feature_fn,
+             n_shallow_ensemble=n_shallow_ensemble,
+             dtype=dtype,
+@@ -198,6 +199,7 @@ class ModelBuilder:
+             head = {
+                 "use_bias": self.config["use_bias"],
+                 "readout_activation": self.config["readout_activation"],
++                "zero_init_output": self.config["zero_init_output"],
+                 **head,
+             }
+             readout = self.build_readout(head)

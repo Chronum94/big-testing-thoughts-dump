@@ -1,0 +1,448 @@
+{
+ "_notes": "Fractional coordinates as printed in the source. 'verified' = read in the primary CIF/SI by us or agentA (see PBA_PLAN.md). P2_1/n ops: x,y,z; -x+1/2,y+1/2,-z+1/2; -x,-y,-z; x+1/2,-y+1/2,z+1/2 (builder in p21n_check.py).",
+ "Fe4[Fe(CN)6]3.14H2O (Prussian blue)": {
+  "source": "Buser, Schwarzenbach, Petter, Ludi, Inorg. Chem. 16, 2704 (1977), doi 10.1021/ic50177a008 (doi not checked); COD 4343748",
+  "verified": true,
+  "how": "COD CIF read",
+  "space_group": "Pm-3m (221)",
+  "a_A": 10.166,
+  "Z_formula_per_cell": 1,
+  "T": "RT (not stated in CIF)",
+  "sites": [
+   {
+    "label": "Fe1",
+    "el": "Fe",
+    "ox": "+3 (N-bound, HS)",
+    "xyz": [
+     0,
+     0,
+     0
+    ],
+    "occ": 1.0
+   },
+   {
+    "label": "Fe2",
+    "el": "Fe",
+    "ox": "+3 (N-bound, HS)",
+    "xyz": [
+     0,
+     0.5,
+     0.5
+    ],
+    "occ": 1.0
+   },
+   {
+    "label": "Fe3",
+    "el": "Fe",
+    "ox": "+2 (C-bound, LS)",
+    "xyz": [
+     0.5,
+     0.5,
+     0.5
+    ],
+    "occ": 0.267
+   },
+   {
+    "label": "Fe4",
+    "el": "Fe",
+    "ox": "+2 (C-bound, LS)",
+    "xyz": [
+     0.5,
+     0,
+     0
+    ],
+    "occ": 0.911
+   },
+   {
+    "label": "N1",
+    "el": "N",
+    "xyz": [
+     0.2005,
+     0,
+     0
+    ],
+    "occ": 0.911
+   },
+   {
+    "label": "N2",
+    "el": "N",
+    "xyz": [
+     0.2005,
+     0.5,
+     0.5
+    ],
+    "occ": 0.267
+   },
+   {
+    "label": "N3",
+    "el": "N",
+    "xyz": [
+     0.2995,
+     0.5,
+     0
+    ],
+    "occ": 0.911
+   },
+   {
+    "label": "C1",
+    "el": "C",
+    "xyz": [
+     0.3108,
+     0,
+     0
+    ],
+    "occ": 0.911
+   },
+   {
+    "label": "C2",
+    "el": "C",
+    "xyz": [
+     0.3108,
+     0.5,
+     0.5
+    ],
+    "occ": 0.267
+   },
+   {
+    "label": "C3",
+    "el": "C",
+    "xyz": [
+     0.1887,
+     0.5,
+     0
+    ],
+    "occ": 0.911
+   },
+   {
+    "label": "O1",
+    "el": "O",
+    "role": "coordinated H2O at vacancy",
+    "xyz": [
+     0.21,
+     0,
+     0
+    ],
+    "occ": 0.089
+   },
+   {
+    "label": "O2",
+    "el": "O",
+    "role": "coordinated H2O at vacancy",
+    "xyz": [
+     0.21,
+     0.5,
+     0.5
+    ],
+    "occ": 0.733
+   },
+   {
+    "label": "O3",
+    "el": "O",
+    "role": "coordinated H2O",
+    "xyz": [
+     0.29,
+     0.5,
+     0
+    ],
+    "occ": 0.089
+   },
+   {
+    "label": "O4",
+    "el": "O",
+    "role": "zeolitic H2O (8g, near 8c cage centre)",
+    "xyz": [
+     0.2608,
+     0.2608,
+     0.2608
+    ],
+    "occ": 1.0
+   }
+  ],
+  "derived_bonds_A": {
+   "Fe(III)-N": 2.038,
+   "Fe(II)-C": [
+    1.918,
+    1.923
+   ],
+   "C-N": [
+    1.121,
+    1.126
+   ],
+   "Fe(III)-OH2": 2.135
+  },
+  "vacancy_fraction_Fe(CN)6": 0.25
+ },
+ "K2Fe[Fe(CN)6] (Prussian white, refined K1.946)": {
+  "source": "Cattermull, Roth, Cassidy, Pasta, Goodwin, JACS 145, 24249 (2023), doi 10.1021/jacs.3c08751, SI Table S6",
+  "verified": true,
+  "how": "SI pdf + xlsx read (agentA)",
+  "space_group": "P2_1/n (unique axis b)",
+  "a_A": 10.063,
+  "b_A": 7.276,
+  "c_A": 6.948,
+  "beta_deg": 89.7977,
+  "V_A3": 508.8,
+  "formula_units_per_cell": 2,
+  "pseudocubic_a_A": 10.06,
+  "T": "RT",
+  "sites": [
+   {
+    "el": "Fe",
+    "role": "C-bound LS Fe(II)",
+    "xyz": [
+     0,
+     0,
+     0
+    ],
+    "occ": 1
+   },
+   {
+    "el": "Fe",
+    "role": "N-bound HS Fe(II)",
+    "xyz": [
+     0.5,
+     0,
+     0
+    ],
+    "occ": 1
+   },
+   {
+    "el": "K",
+    "xyz": [
+     0.7499,
+     0.56149,
+     -0.0197
+    ],
+    "occ": 0.973,
+    "note": "refined K1.946 per f.u.; ideal cage centre (0.75,0.5,0)"
+   },
+   {
+    "el": "C",
+    "xyz": [
+     -0.0322,
+     0.858,
+     0.7744
+    ]
+   },
+   {
+    "el": "C",
+    "xyz": [
+     -0.0318,
+     0.211,
+     0.8542
+    ]
+   },
+   {
+    "el": "C",
+    "xyz": [
+     0.8123,
+     -0.0004,
+     0.0619
+    ]
+   },
+   {
+    "el": "N",
+    "xyz": [
+     -0.0437,
+     0.754,
+     0.6584
+    ]
+   },
+   {
+    "el": "N",
+    "xyz": [
+     0.9485,
+     0.3353,
+     0.7609
+    ]
+   },
+   {
+    "el": "N",
+    "xyz": [
+     0.7045,
+     -0.0312,
+     0.0913
+    ]
+   }
+  ],
+  "derived": {
+   "K_offcentre_A": 0.47,
+   "Fe(LS)-C_A": [
+    1.868,
+    1.936
+   ],
+   "Fe(HS)-N_A": [
+    2.167,
+    2.232
+   ],
+   "C-N_A": [
+    1.112,
+    1.131
+   ]
+  },
+  "transition": "P2_1/n -> P4/mnc at 599.3 K on heating; decomposition 778 K (SI Table S14)"
+ },
+ "K2Mn[Fe(CN)6] (refined K1.9736)": {
+  "source": "Cattermull et al. JACS 145, 24249 (2023), doi 10.1021/jacs.3c08751, SI Table S7",
+  "verified": true,
+  "how": "SI read (agentA)",
+  "space_group": "P2_1/n",
+  "a_A": 10.0991,
+  "b_A": 7.3349,
+  "c_A": 6.948,
+  "beta_deg": 90.0118,
+  "V_A3": 514.75,
+  "formula_units_per_cell": 2,
+  "T": "RT",
+  "sites": [
+   {
+    "el": "Fe",
+    "role": "C-bound LS Fe(II)",
+    "xyz": [
+     0,
+     0,
+     0
+    ],
+    "occ": 1
+   },
+   {
+    "el": "Mn",
+    "role": "N-bound HS Mn(II)",
+    "xyz": [
+     0.5,
+     0,
+     0
+    ],
+    "occ": 1
+   },
+   {
+    "el": "K",
+    "xyz": [
+     0.7517,
+     0.56517,
+     -0.0204
+    ],
+    "occ": 0.987
+   },
+   {
+    "el": "C",
+    "xyz": [
+     -0.0344,
+     0.855,
+     0.7713
+    ]
+   },
+   {
+    "el": "C",
+    "xyz": [
+     -0.0356,
+     0.2136,
+     0.8554
+    ]
+   },
+   {
+    "el": "C",
+    "xyz": [
+     0.8174,
+     -0.0133,
+     0.0667
+    ]
+   },
+   {
+    "el": "N",
+    "xyz": [
+     -0.0517,
+     0.7642,
+     0.6491
+    ]
+   },
+   {
+    "el": "N",
+    "xyz": [
+     0.9429,
+     0.3412,
+     0.764
+    ]
+   },
+   {
+    "el": "N",
+    "xyz": [
+     0.707,
+     -0.0294,
+     0.1032
+    ]
+   }
+  ],
+  "derived": {
+   "K_offcentre_A": 0.5,
+   "Fe-C_A": [
+    1.9,
+    1.94
+   ],
+   "Mn-N_A": [
+    2.22,
+    2.26
+   ],
+   "C-N_A": [
+    1.09,
+    1.15
+   ]
+  },
+  "other_cells": {
+   "Deng 2021 K1.94Mn[Fe(CN)6]0.994.0.08H2O (doi 10.1038/s41467-021-22499-0)": {
+    "a": 10.0912,
+    "b": 7.3243,
+    "c": 6.9442,
+    "beta": 90.016,
+    "verified": true,
+    "note": "printed coordinates inconsistent; do not use"
+   },
+   "795 K (CAT23 S9)": {
+    "sg": "P2_1/n",
+    "a": 10.32,
+    "b": 7.32,
+    "c": 7.206,
+    "beta": 89.924
+   },
+   "803 K T' (CAT23 S10)": {
+    "sg": "P4/mnc",
+    "a": 7.308,
+    "c": 10.276
+   }
+  },
+  "transition": "P2_1/n -> P4/mnc, Tc = 797 K"
+ },
+ "KMn[Fe(CN)6].H2O / .2H2O": {
+  "source": "Malecki & Ratuszna, Powder Diffr. 14, 25 (1999), doi 10.1017/S0885715600010265; COD 6000335/1521296",
+  "verified": true,
+  "how": "COD CIF (cell only, no coordinates)",
+  "space_group": "P2_1/c",
+  "a_A": 10.108,
+  "b_A": 10.104,
+  "c_A": 10.114,
+  "beta_deg": 92.93
+ },
+ "K-Prussian blue ('soluble', K-containing, cubic)": {
+  "source": "PDF 04-016-2997 / Bueno et al. JPCC 112, 13264 (2008), doi 10.1021/jp802070f, as cited by Mansour et al. ECS JSS 10, 103002 (2021)",
+  "verified": false,
+  "space_group": "Fm-3m",
+  "a_A": 10.178,
+  "note": "Bueno: ~25% [Fe(CN)6] vacancies; K at 24e near coordinated water, not 8c (secondary)"
+ },
+ "Cu-hexacyanoferrate template for Fm-3m 24e x (analogue)": {
+  "source": "Ojwang et al. (OSTI 1302943), K2/3Cu[Fe(CN)6]0.68.2.2H2O",
+  "verified": true,
+  "how": "accepted-manuscript Table 3b (agentA)",
+  "space_group": "Fm-3m",
+  "a_A": 10.0487,
+  "C_24e_x": 0.1917,
+  "N_24e_x": 0.3061,
+  "O_coord_24e_x": 0.212,
+  "K_sites": "32f x=0.224 occ 0.04; 48g (0.325,1/4,1/4) occ 0.03; no K on 8c",
+  "K_free_a_A": 10.1314
+ },
+ "Fe[Fe(CN)6] (Berlin green)": {
+  "verified": false,
+  "note": "no primary cell found; FeFe(CN)6 thermal expansion paper doi 10.1039/c8dt05111a not read in full"
+ }
+}
