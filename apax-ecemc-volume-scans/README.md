@@ -65,7 +65,7 @@ All arms have the same size and the same training recipe (200 epochs):
 
 ## Results (2026-10-21, one seed per arm)
 
-**Headline.**
+**Headline (v1, isotropic scans; anisotropic general-strain scans do better still, see §5).**
 - **Rigid-molecule volume scans give the same intermolecular-force gain on held-out MD as new teacher MD of the same size, at about 1/18 of the teacher calls.**
 - **They are the only augmentation that keeps the energy flat across density.**
 - **Duplicating frames gives the lowest training loss and the worst test error. Bond-stretching (affine) scaling recovers only a third of the intermolecular gain.**

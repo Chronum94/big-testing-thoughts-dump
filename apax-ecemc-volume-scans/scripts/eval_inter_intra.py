@@ -18,7 +18,7 @@ from ase.io import read  # noqa: E402
 
 from apax.md import ASECalculator  # noqa: E402
 
-exec("def whole" + open("/home/chronum/scratch/ecemc/volume_scan.py").read().split("def whole")[1].split("out, skipped")[0])  # noqa: S102
+exec("def whole" + open("/home/chronum/scratch/ecemc/volume_scan.py").read().split("def whole")[1].split("\n\n\n")[0])  # noqa: S102  (only the function body)
 
 
 def name_of(sym):
