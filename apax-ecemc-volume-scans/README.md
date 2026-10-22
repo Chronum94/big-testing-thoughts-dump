@@ -168,7 +168,8 @@ Each also has its own held-out s2 test set (`scripts/crossed_eval.sh`; raw outpu
 - **Orthorhombic strain gives the best energies** on all four test sets (2.04–2.22 meV/atom), with the flattest scan-energy curves.
 - **Isotropic and anisotropic training transfer to each other's tests.** Each is ~5–10 % better on its own kind; anisotropy is the better bet overall.
 - **`fresh` MD does not transfer off equilibrium:** 31–35 translational on every scan-type test, vs 23–27 for any rigid-scan arm.
-- **One seed per arm.** Gaps of ~5–10 % between the scan arms need the second seeds (running).
+- **One seed per arm.** Gaps of ~5–10 % between the scan arms need the second seeds.
+- **Superseded by the two-seed results in §7.** The `ortho`-best-energy claim and the `gen`-beats-`fresh`-on-MD claim did not survive.
 
 ### 6. Error structure (held-out MD)
 
@@ -195,10 +196,45 @@ Each also has its own held-out s2 test set (`scripts/crossed_eval.sh`; raw outpu
 
 Plain parity plots: `figs/parity_components_md.png`.
 
+### 7. Two seeds per arm, and the pairwise energy-difference loss (2026-10-22)
+
+**Pairwise loss (`pairwise_mse`, added to `apax/train/loss.py`).**
+- d_i is the per-atom energy error of structure i in a batch. The term is the mean over all batch pairs of (d_i − d_j)².
+- That equals 2N/(N−1) × the within-batch variance of d, so a batch-common error offset is invisible to it.
+- It is added on top of the normal energy MSE with weight λ = 150, `atoms_exponent: 0`. That is about 3.8× extra weight on within-batch error spread.
+- Two batching variants:
+  - `genroll`: random batches.
+  - `genroll_pbp`: pbp batching with size buckets of ratio 1.1. pbp buckets by neighbour-pair count, which in these liquids groups frames of similar density.
+- Both use the `gen` training data.
+
+Held-out s2 data, mean of seeds 1 and 2 (seed 1 / seed 2 in brackets). Forces in meV/Å, E in meV/atom:
+
+| arm | test MD trans | rot | intra | E | general-scan trans | rot |
+|---|---|---|---|---|---|---|
+| `scan` | 21.6 (24.5 / 18.8) | 14.3 | 95.2 | 2.19 (2.31 / 2.07) | 23.1 (25.3 / 20.8) | 16.5 |
+| `fresh` | 22.4 (22.7 / 22.0) | 15.2 | **89.7** | 2.13 (2.09 / 2.17) | 31.7 (33.4 / 30.0) | 21.1 |
+| `ortho` | 21.9 (23.7 / 20.1) | 14.6 | 94.6 | 1.92 (2.04 / 1.80) | 23.6 (25.3 / 21.9) | 16.3 |
+| `gen` | 20.4 (22.1 / 18.6) | 13.9 | 94.8 | 2.09 (2.11 / 2.07) | 21.8 (22.8 / 20.8) | 15.6 |
+| `genroll` | 20.4 (21.3 / 19.4) | 14.5 | 94.2 | 1.85 (1.88 / 1.83) | 21.0 (20.8 / 21.1) | 15.4 |
+| `genroll_pbp` | **19.6** (20.1 / 19.0) | **13.4** | 93.0 | **1.85** (1.82 / 1.89) | **20.8** (21.0 / 20.6) | **14.6** |
+
+**Reading:**
+- **Seed noise is large.** One seed can move test-MD translational error by ±3 meV/Å (`scan`: 24.5 vs 18.8), and validation energy by ~25 %. Differences among `scan` / `ortho` / `gen` / `fresh` on MD-frame forces are within it.
+- **What survives two seeds:**
+  - Rigid scans beat fresh MD off equilibrium (general-scan translational 21–24 vs 31.7; rotational 15–16.5 vs 21.1).
+  - Fresh MD is best on intramolecular forces (89.7 vs 93–95).
+- **The pairwise loss is the first energy effect consistent across seeds.**
+  - Test-MD E is 1.85 for both `genroll` and `genroll_pbp`, with all four individual seeds at 1.82–1.89, against 2.09 for `gen` (2.11 / 2.07): **−11 %**.
+  - Force errors do not get worse; `genroll_pbp` has the lowest translational and rotational errors in both seeds.
+  - This comes despite the pairwise term being ~1e-4 of the loss at the end of training (§ on loss shares). So treat it as promising, not settled: λ, batch-size and batch-composition sweeps with 3–4 seeds are queued to stress-test it.
+- **`mix`** (50/50 `ortho` + `gen` scans, dose-matched, seed 1) lands between its parents (test MD 23.4 / 14.1 / 94.9, E 2.16). There is no sign that the strain types add up.
+
 ### Next
-- **In progress:**
-  - a within-batch pairwise energy-difference loss (`pairwise_mse`: mean over batch pairs of (d_i − d_j)², d = per-atom energy error; equals the within-batch error variance, blind to a common offset), on the `gen` data with random and pbp size-bucketed batches;
-  - second seeds of `scan`, `fresh`, `ortho`, `gen`.
+- **Queued stress tests** (paired seeds 1–4):
+  - `ortho` vs `gen` at strain norms 0.03 / 0.06 / 0.12;
+  - new discriminating test sets: pure shear, large uniaxial, density/temperature shift, 2× boxes, and carbonyl↔ether rigid-swap pairs around Li⁺;
+  - pairwise loss vs λ (0 / 150 / 1e3 / 3e3 / 1e4), batch size (4 / 8 / 16) and batch composition (random / density-bucketed / composition-bucketed);
+  - energy-weighting arms (MACE-style end phase, + pairwise, energy weight 100, and a +50-epoch control).
 - **Cost-matched comparison at a fixed teacher-call budget,** e.g. 21 MD runs vs 7 runs + 3 rigid scans per frame, on the same s2 test, two seeds each.
 - **A `fresh + scan` arm.**
 
