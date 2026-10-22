@@ -1,0 +1,86 @@
+n_epochs: 200
+seed: 1
+ckpt_interval: 50
+patience: null
+callbacks:
+- name: csv
+progress_bar:
+  disable_batch_pbar: true
+  disable_epoch_pbar: false
+data:
+  directory: /home/chronum/scratch/ecemc/models
+  experiment: arm_dup
+  train_data_path: /home/chronum/scratch/ecemc/data/dup/train.extxyz
+  val_data_path: /home/chronum/scratch/ecemc/data/val.extxyz
+  batch_size: 4
+  valid_batch_size: 8
+  pos_unit: Ang
+  energy_unit: eV
+  dataset:
+    processing: cached
+    shuffle_buffer_size: 1000
+  scale_method: per_element_force_rms_scale
+  shift_method: per_element_regression_shift
+  shift_options:
+    energy_regularisation: 1.0e-05
+loss:
+- name: energy
+  loss_type: mse
+  weight: 1.0
+- name: forces
+  loss_type: mse
+  weight: 4.0
+metrics:
+- name: energy
+  reductions:
+  - mae
+- name: forces
+  reductions:
+  - mae
+  - mse
+model:
+  name: gmnn
+  basis:
+    name: bessel
+    n_basis: 12
+    r_max: 5.0
+  n_radial: 12
+  n_radial_tensor: 5
+  n_contr: 8
+  radial_rank: 8
+  radial_emb_jitter: 0.1
+  drop_contractions: []
+  nn:
+  - 128
+  - 128
+  use_bias: false
+  readout_activation: identity
+  zero_init_output: true
+  emb_init: uniform
+  radial_transform: identity
+  empirical_corrections:
+  - name: nlh
+    r_max: 5.0
+  calc_stress: false
+  descriptor_dtype: fp32
+  readout_dtype: fp32
+  scale_shift_dtype: fp64
+  packed_moments: true
+optimizer:
+  name: muon
+  nn_lr: 0.001
+  emb_lr: 0.001
+  scale_lr: 0.001
+  shift_lr: 0.003
+  zbl_lr: 0.0001
+  kwargs:
+    muon_lr: 0.02
+    muon_weight_decay: 0.01
+  schedule:
+    name: cyclic_cosine
+    period: 200
+    decay_factor: 0.93
+weight_average:
+  ema_start: 100
+  decay: 0.999
+scan_epoch: true
