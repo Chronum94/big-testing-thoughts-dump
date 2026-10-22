@@ -136,10 +136,68 @@ The scan test set favours the scan arm: it is the same kind of augmentation. Wha
 - **HF and LiF** have 1–2 molecules per box. Their per-type numbers are noise.
 - The validation per-atom energies assume ≈143 atoms per frame (boxes are 135–151). The test tables use exact per-frame atom counts.
 
+### 5. Anisotropic rigid scans: orthorhombic vs general strain (2026-10-22)
+Two more arms, each dose-matched to `scan`:
+- the same source frames;
+- the same s values with the same per-s counts (106 / 146 / 147);
+- the same volume change, det U = s³.
+
+Centres of mass and cell move by U = expm(ln s · I + D), where D is traceless with Frobenius norm fixed at 0.06 (about ±3.5 % per direction). Molecules stay rigid. The arms differ only in D (`scripts/volume_scan.py --aniso 0.06 --aniso_mode ...`):
+- **`ortho`:** D diagonal (stretch only), so the cell stays orthorhombic.
+- **`gen`:** D a general symmetric matrix (stretch + shear), so the cell becomes triclinic.
+
+Each also has its own held-out s2 test set (`scripts/crossed_eval.sh`; raw output in `logs/eval/`).
+
+**Crossed evaluation, all atoms.** Each cell is translational / rotational / intramolecular force RMSE (meV/Å) / E MAE (meV/atom; for scan-type sets, the mean over s). Bold marks the best value in each column.
+
+| arm \ test | MD (393) | isotropic scan (399) | ortho scan | general scan |
+|---|---|---|---|---|
+| `dup` | 36.4 / 18.5 / 102.3 / 2.47 | 48.1 / 24.8 / 112.9 / 3.09 | 50.6 / 26.6 / 116.8 / 3.09 | 48.9 / 25.5 / 114.5 / 3.05 |
+| `scan` | 24.5 / 14.4 / 93.8 / 2.31 | 25.2 / 15.7 / 92.9 / 2.43 | 26.8 / 17.1 / 94.3 / 2.37 | 25.3 / 16.3 / 93.3 / 2.34 |
+| `aff` | 32.5 / 17.6 / 93.2 / 2.67 | 32.6 / 19.4 / 96.2 / 2.92 | 35.2 / 21.6 / 98.0 / 2.90 | 32.6 / 20.2 / 96.7 / 2.84 |
+| `fresh` | 22.7 / 14.5 / **90.4** / 2.09 | 31.5 / 19.2 / 96.1 / 2.68 | 34.9 / 21.5 / 99.6 / 2.66 | 33.4 / 20.3 / 97.9 / 2.67 |
+| `ortho` | 23.7 / 14.5 / 92.4 / **2.04** | 25.2 / **15.2** / **91.2** / **2.22** | 26.0 / 16.0 / **91.7** / **2.15** | 25.3 / 15.9 / **91.3** / **2.12** |
+| `gen` | **22.1** / **13.9** / 93.0 / 2.11 | **22.8** / **15.2** / 91.6 / 2.32 | **23.5** / **15.6** / 91.8 / 2.25 | **22.8** / **15.4** / 91.6 / 2.21 |
+
+**Reading:**
+- **General strain has the lowest intermolecular force error on every test set.** On held-out MD it edges out `fresh`: 22.1 vs 22.7 translational, 13.9 vs 14.5 rotational, at about 1/18 of the teacher calls. That's −39 % translational vs `dup`. On `scan`'s own isotropic test it beats `scan` (22.8 vs 25.2).
+- **Orthorhombic strain gives the best energies** on all four test sets (2.04–2.22 meV/atom), with the flattest scan-energy curves.
+- **Isotropic and anisotropic training transfer to each other's tests.** Each is ~5–10 % better on its own kind; anisotropy is the better bet overall.
+- **`fresh` MD does not transfer off equilibrium:** 31–35 translational on every scan-type test, vs 23–27 for any rigid-scan arm.
+- **One seed per arm.** Gaps of ~5–10 % between the scan arms need the second seeds (running).
+
+### 6. Error structure (held-out MD)
+
+![component errors](figs/err_components_md.png)
+
+**Least-squares slope of error vs teacher component** (student ≈ (1 + slope) × teacher; `figs/err_components_md.png`):
+
+| arm | translational, all | translational, Li⁺ | rotational | intramolecular |
+|---|---|---|---|---|
+| `dup` | +0.044 | +0.107 | −0.082 | −0.007 |
+| `scan` | +0.055 | +0.103 | −0.064 | −0.006 |
+| `aff` | +0.068 | +0.143 | −0.052 | −0.005 |
+| `fresh` | +0.044 | +0.101 | −0.060 | −0.005 |
+
+- **Rotational slopes are negative.** That is ordinary regression to the mean of an MSE-optimal (conditional-mean) predictor with residual variance: the slope against the target is ≈ −Var(ε)/Var(y). Extra data reduces it.
+- **Translational slopes are positive, which shrinkage cannot produce.** It is a systematic overestimate of net forces on molecules: ~5 % for the solvent and **10–14 % for Li⁺**. The Li⁺–environment interaction is effectively too stiff. The augmentations reduce variance, not this bias.
+
+![error vs magnitude](figs/err_vs_mag_md.png)
+
+**Error vs component magnitude** (12 equal-count bins; `figs/err_vs_mag_md.png`):
+- Translational error is flat up to ~100 meV/Å, then jumps to 120–200 meV/Å in the top bin, which is mostly Li⁺ and other ions. `gen` cuts that bin the most (0.58× `dup`).
+- Rotational error grows steadily with magnitude. `gen` is lowest in most bins (0.69–0.80×).
+- Intramolecular error: `fresh` is best at large forces (0.86×), the scan arms ~0.9×.
+
+Plain parity plots: `figs/parity_components_md.png`.
+
 ### Next
+- **In progress:**
+  - a within-batch pairwise energy-difference loss (`pairwise_mse`: mean over batch pairs of (d_i − d_j)², d = per-atom energy error; equals the within-batch error variance, blind to a common offset), on the `gen` data with random and pbp size-bucketed batches;
+  - second seeds of `scan`, `fresh`, `ortho`, `gen`.
 - **Cost-matched comparison at a fixed teacher-call budget,** e.g. 21 MD runs vs 7 runs + 3 rigid scans per frame, on the same s2 test, two seeds each.
 - **A `fresh + scan` arm.**
-- **Second seed for all four arms.**
+
 - **Student MD vs teacher MD Li⁺ solvation,** carbonyl vs ether O per solvent (`scripts/solvation.py`), to check whether the intermolecular gains show up in the observable.
 - **Ordering test:** energy differences between carbonyl- and ether-bound Li⁺ configurations (rigid swaps).
 
