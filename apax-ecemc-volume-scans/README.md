@@ -148,6 +148,10 @@ Centres of mass and cell move by U = expm(ln s · I + D), where D is traceless w
 
 Each also has its own held-out s2 test set (`scripts/crossed_eval.sh`; raw output in `logs/eval/`).
 
+![crossed heatmap](figs/crossed_heatmap.png)
+
+`figs/crossed_heatmap.png`: one panel per metric; colour = value ÷ best in that test column (white = best, darker = worse); cell text = absolute value (`scripts/plot_crossed_heatmap.py`).
+
 **Crossed evaluation, all atoms.** Each cell is translational / rotational / intramolecular force RMSE (meV/Å) / E MAE (meV/atom; for scan-type sets, the mean over s). Bold marks the best value in each column.
 
 | arm \ test | MD (393) | isotropic scan (399) | ortho scan | general scan |
