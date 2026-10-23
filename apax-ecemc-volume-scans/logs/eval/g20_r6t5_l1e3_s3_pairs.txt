@@ -1,0 +1,8 @@
+swapall: n 101 pairs | dE MAE 169.6 meV | mean -135.5 | RMSE 435.2 | sign agree 1.000 | tau 0.866 | teacher mean |dE| 1814.1 meV
+  EC C->E: n 88 | dE MAE 140.4 | sign agree 1.000
+  EMC C->E: n 5 | dE MAE 107.4 | sign agree 1.000
+  EMC E->C: n 5 | dE MAE 101.8 | sign agree 1.000
+swapemc: n 43 pairs | dE MAE 549.9 meV | mean -498.5 | RMSE 1418.5 | sign agree 1.000 | tau 0.925 | teacher mean |dE| 3408.6 meV
+  EMC C->E: n 24 | dE MAE 317.7 | sign agree 1.000
+  EMC E->C: n 17 | dE MAE 940.0 | sign agree 1.000
+scanfam (test_gen): n 312 pairs | within-family d(E/atom) MAE 0.736 meV/atom | RMSE 1.097

@@ -296,7 +296,7 @@ The orthorhombic ladder follows the same trend: test MD trans 21.9 / 20.5 / 21.0
   - At 0.20 most compressed frames fail the 1.5 Å contact check (5–7 % survive). The pools were oversampled: every 2nd MD frame, plus an extra compressed-only pass with 6 strains per frame.
   - As a result, the 399 g20/o20 scan frames come from **236 / 229 distinct MD frames, vs 147** for every arm at ≤ 0.12.
   - The surviving compressed frames are also a selected subset: strain directions that happen to avoid close contacts.
-  - A g12/o12 rebuilt from the same oversampled source set is the control that separates strain size from diversity. Not run yet.
+  - A g12 rebuilt from the same oversampled source set (`g12w`) separates strain size from diversity: see §13. Diversity explains most of the energy-transfer gain; strain size explains the force and swap gains.
 
 **Error structure** (`figs/err_stress_uniax.png`, `figs/err_stress_md.png`; seed 1, error vs teacher value, slope of the linear fit):
 
@@ -374,12 +374,78 @@ The loss itself is upstream in apax `model-and-perf-improvements` (`d8787dc9`, `
 - They still rank models, through ΔE error and Kendall τ, but they do not test the small differences between binding modes that motivated this study.
 - A real ordering test needs teacher-relaxed swap pairs, or pairs selected for |ΔE| below ~50 meV.
 
+### 13. Strain vs diversity, and the pairwise loss on wide data (2026-10-23)
+
+Four new arms, 4 seeds each (`scripts/job_pw2.sh`):
+- `g12w`: g12 strain from a wide source set; its 399 scans come from 254 distinct MD frames (g20: 236, g12: 147).
+- `g20_l1e3`: g20 plus pairwise λ = 1e3.
+- `g20_r6t5_l0` and `g20_r6t5_l1e3`: g20 at `r_max` 6 / `n_radial_tensor` 5, without and with λ = 1e3.
+
+Full tables in `logs/pw2_summary.md`.
+
+**Strain size vs source diversity** (resolves the §9 confound):
+
+| metric | g12 (147 src) | g12w (254 src) | diversity only | g20 (236 src) | strain only (g12w → g20) |
+|---|---|---|---|---|---|
+| test MD trans / intra | 19.1 / 92.2 | 18.8 / 91.5 | −2 % / −1 % | 18.0 / 86.9 | −4 % / −5 % |
+| test MD E | 1.92 | 1.77 | −8 % | 1.61 | −9 % |
+| uniax trans / intra | 23.5 / 102.9 | 23.8 / 103.0 | 0 % / 0 % | 21.3 / 96.0 | −11 % / −7 % |
+| shift E | 1.49 | 1.02 | **−32 %** | 0.96 | −6 % |
+| x2 E | 1.84 | 1.50 | **−18 %** | 1.45 | −3 % |
+| swap ΔE all / EMC | 193 / 696 | 208 / 704 | +8 % / +1 % | 159 / 502 | **−24 % / −29 %** |
+
+- **More distinct source frames mostly help energy transfer** to new densities, temperatures and box sizes. They do nothing for strained forces or swap ΔE.
+- **Larger strain drives the force gains and the swap gains.** Close contacts teach the repulsive wall.
+- So about two-thirds of g20's shifted-set energy gain was diversity, and all of its force and swap gain was strain size.
+
+**Pairwise λ = 1e3 on wide data:**
+
+| metric | g20 | + λ | Δ | g20 6/5 | + λ | Δ |
+|---|---|---|---|---|---|---|
+| test MD E | 1.61 | 1.77 | +10 % | 1.62 | 1.57 | −3 % |
+| shift E | 0.96 | 1.05 | +9 % | 1.08 | 0.86 | −20 % |
+| x2 E | 1.45 | 0.84 | **−42 %** | 1.22 | 0.80 | **−34 %** |
+| uniax E | 1.64 | 1.78 | +9 % | 1.66 | 1.48 | −11 % |
+| scan-family ΔE | 0.913 | 0.814 | −11 % | 0.913 | 0.771 | −16 % |
+| test MD trans / intra | 18.0 / 86.9 | 17.2 / 89.1 | −4 % / +3 % | 17.0 / 86.0 | 16.2 / 85.5 | −5 % / −1 % |
+| swap ΔE (all) | 159 | 170 | +7 % | 149 | 155 | +4 % |
+
+- **The 2× box gain holds in every setting tested:** −34 to −45 % across `gen`, g20 and g20 at 6/5.
+- **At 5 Å on g20 the other energies get ~10 % worse:** the wide data already pins them, and the extra term competes.
+- **At 6/5 it improves every energy metric,** with forces slightly better.
+- **It never helps swap ΔE.**
+
+**Best recipe so far: g20 + 6 Å / 5 tensor channels + λ = 1e3, against fresh MD** (same teacher budget: 441 MD + 399 labelled frames):
+
+| | trans | rot | intra | test MD E | x2 E | swap ΔE |
+|---|---|---|---|---|---|---|
+| fresh (5/5) | 22.4 | 15.2 | 89.7 | 2.13 | 1.77 | 309 |
+| g20 6/5 + λ | 16.2 (−28 %) | 12.6 (−17 %) | 85.5 (−5 %) | 1.57 (−26 %) | 0.80 (−55 %) | 155 (−50 %) |
+
+**What the pairwise loss fixes** (`figs/err_pairwise_scatter.png`, `scripts/plot_pw_scatter.py`; seed 1, three matched pairs; per-frame energy error vs teacher energy, and force-component error):
+- **Energy errors form vertical blobs,** one per trajectory, i.e. per composition / density / temperature. Each blob has its own offset.
+- **The 2× box error is almost pure offset** (MAE ≈ |mean|). The pairwise term pulls the blob offsets toward zero:
+  - x2 mean offset +2.28 → +0.92, +1.42 → +0.27 and +1.77 → +0.76 meV/atom;
+  - shift +0.61 → +0.16, +0.45 → +0.28, +0.88 → +0.43.
+- **The spread within each blob does not change.**
+- **One test-MD trajectory near −6.10 eV/atom stays at +5–7 meV/atom in every model.** Not yet identified.
+- **Forces are unchanged:** RMSE within ±4 %, fit slope ≈ −0.005 everywhere.
+
+**What it optimises.**
+- With per-atom energy errors d_i in a batch of B, the term mean_{i<j}(d_i − d_j)² equals 2B/(B−1) · Var_batch(d). The energy MSE splits as Var_batch(d) + (mean d)².
+- So the pairwise term up-weights only the within-batch variance of per-atom energy errors (λ = 1e3 ≈ 25× here). The per-structure gradient is ∝ (d_i − d̄).
+- Because batches mix compositions, this mainly corrects composition-dependent offsets, i.e. mis-apportioned per-element reference energies. It is a gauge fix learned jointly with the network.
+- Only a single offset common to all structures is invisible to it, and that one is physically meaningless.
+- **Consequences that match the data:**
+  - Batches bucketed by atom count (one composition per batch) hide the offsets it fixes, consistent with that mode never beating random batches.
+  - More pairs per batch (B² growth) strengthen it: −3 % energy at batch 4, −20–26 % at batches 8–16.
+  - Carbonyl vs ether binding is a within-composition difference, so it is the wrong tool for the ordering question.
+
 ### Next
-- **Strain size vs source-frame diversity:** g12 / o12 built from the oversampled 0.20 source set (~230 MD frames), 4 seeds.
+- **Running:** batch 16 at matched optimiser steps (800 epochs, cosine period and EMA start scaled), with λ = 0 / 3e3 and with √4-scaled learning rates; 3 seeds each (`runs_bs.txt`). It asks whether the large-batch force gap is a real generalization gap or just 4× fewer optimiser steps under Muon.
+- **Energy weight ×25 without pairwise vs pairwise λ = 1e3:** is the pairwise term more than "energy weight minus the batch-mean part"?
 - **Push the strain further:** 0.30, to find the turnover.
-- **Combine the winners:** g20 + λ = 1e3 at `r_max` 6 / `n_radial_tensor` 5.
 - **Loss-share mechanism:** a force loss with up-weighted translational and rotational components, without extra strain.
-- **Batch size at matched optimiser steps.**
 - **A small-ΔE ordering test set:** relaxed carbonyl / ether Li⁺ pairs.
 - **Student MD vs teacher MD Li⁺ solvation** (`scripts/solvation.py`).
 
@@ -395,4 +461,4 @@ The loss itself is upstream in apax `model-and-perf-improvements` (`d8787dc9`, `
 - **Short scan pools:** at 0.12 the contact rejection left one scale's pool 3 frames short. `make_strain_arms.py` now tops up with repeats (≤ 3 of 399) and reports it.
 - **pueue daemon in an agent shell's process group:** a low-memory reaper killed that group and took the daemon down mid-run. Start it with `setsid -f pueued -d`.
 
-Raw evaluation output: `logs/arms_eval_raw.md`, `logs/eval/` (one file per model × test set). Summaries: `logs/strain_ladder_summary.md`, `logs/stress_summary.md`, `logs/cutoff_tensor_summary.md`. Training logs: `logs/log_arm_*.csv`.
+Raw evaluation output: `logs/arms_eval_raw.md`, `logs/eval/` (one file per model × test set). Summaries: `logs/strain_ladder_summary.md`, `logs/stress_summary.md`, `logs/cutoff_tensor_summary.md`, `logs/pw2_summary.md`. Training logs: `logs/log_arm_*.csv`.
