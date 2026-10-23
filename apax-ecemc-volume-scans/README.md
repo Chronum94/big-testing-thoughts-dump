@@ -198,7 +198,7 @@ Plain parity plots: `figs/parity_components_md.png`.
 
 ### 7. Two seeds per arm, and the pairwise energy-difference loss (2026-10-22)
 
-**Pairwise loss (`pairwise_mse`, added to `apax/train/loss.py`).**
+**Pairwise loss (`pairwise_mse`, added to `apax/train/loss.py`; upstream in `model-and-perf-improvements` as `d8787dc9`).**
 - d_i is the per-atom energy error of structure i in a batch. The term is the mean over all batch pairs of (d_i − d_j)².
 - That equals 2N/(N−1) × the within-batch variance of d, so a batch-common error offset is invisible to it.
 - It is added on top of the normal energy MSE with weight λ = 150, `atoms_exponent: 0`. That is about 3.8× extra weight on within-batch error spread.
@@ -229,21 +229,170 @@ Held-out s2 data, mean of seeds 1 and 2 (seed 1 / seed 2 in brackets). Forces in
   - This comes despite the pairwise term being ~1e-4 of the loss at the end of training (§ on loss shares). So treat it as promising, not settled: λ, batch-size and batch-composition sweeps with 3–4 seeds are queued to stress-test it.
 - **`mix`** (50/50 `ortho` + `gen` scans, dose-matched, seed 1) lands between its parents (test MD 23.4 / 14.1 / 94.9, E 2.16). There is no sign that the strain types add up.
 
-### Next
-- **Queued stress tests** (paired seeds 1–4):
-  - `ortho` vs `gen` at strain norms 0.03 / 0.06 / 0.12;
-  - new discriminating test sets: pure shear, large uniaxial, density/temperature shift, 2× boxes, and carbonyl↔ether rigid-swap pairs around Li⁺;
-  - pairwise loss vs λ (0 / 150 / 1e3 / 3e3 / 1e4), batch size (4 / 8 / 16) and batch composition (random / density-bucketed / composition-bucketed);
-  - energy-weighting arms (MACE-style end phase, + pairwise, energy weight 100, and a +50-epoch control).
-- **Cost-matched comparison at a fixed teacher-call budget,** e.g. 21 MD runs vs 7 runs + 3 rigid scans per frame, on the same s2 test, two seeds each.
-- **A `fresh + scan` arm.**
+### 8. Energy-weighting arms (2026-10-22, one seed each)
 
-- **Student MD vs teacher MD Li⁺ solvation,** carbonyl vs ether O per solvent (`scripts/solvation.py`), to check whether the intermolecular gains show up in the observable.
-- **Ordering test:** energy differences between carbonyl- and ether-bound Li⁺ configurations (rigid swaps).
+Do the energies get better if we simply weight them more? Four arms on the `gen` data, all compared against the same `gen` seed (`configs/arm_gen_{cont,estage,estage_roll,ew100}.yaml`, `scripts/job_ew.sh`):
+- `gen_cont`: `gen` plus 50 more epochs at the same weights. This is the control for the extra epochs.
+- `gen_estage`: plus 50 epochs with the energy weight ×300, like MACE's stage two.
+- `gen_estage_roll`: the same plus the pairwise loss at λ = 3e3.
+- `gen_ew100`: energy weight ×100 from the start.
+
+Test MD (forces meV/Å, E meV/atom):
+
+| arm | trans | rot | intra | E | vs `gen` E |
+|---|---|---|---|---|---|
+| `gen` (200 epochs) | 22.1 | 13.9 | 93.0 | 2.11 | — |
+| `gen_cont` (+50) | **21.2** | **13.8** | 93.6 | **1.99** | −6 % |
+| `gen_estage` (+50, E ×300) | 23.0 | 14.5 | 100.5 | 2.15 | +2 % |
+| `gen_estage_roll` (+ pairwise 3e3) | 23.0 | 14.5 | 100.4 | 2.16 | +2 % |
+| `gen_ew100` (E ×100 throughout) | 35.1 | 21.7 | 129.3 | 2.73 | +29 % |
+
+- **Weighting energies up makes everything worse,** forces and energies both. Each frame carries 3N ≈ 430 force labels against one energy, and the forces are energy gradients, so moving weight onto the single number throws away the denser signal. Muon follows only the direction of the summed gradient, which makes a dominant term take over completely.
+- **The pairwise term does nothing under a ×300 energy weight:** it is swamped.
+- **The +50-epoch control is slightly better than `gen`,** so fixed-epoch comparisons should match total epochs.
+
+Figure: `figs/err_components_ew.png`.
+
+### 9. Stress tests: strain size, strain type, and new test sets (2026-10-23)
+
+**New held-out test sets** (all from s2 MD, teacher-labelled; `scripts/job_stress_data.sh`, `scripts/swap_pairs.py`):
+- `shear`: general strain at norm 0.08, volume unchanged.
+- `uniax`: orthorhombic strain at norm 0.15, volume unchanged.
+- `o12`, `g12`, `o20`, `g20`: scans at those norms.
+- `shift`: new teacher MD at 1.00 / 1.40 g/cm³ and 300 / 600 K.
+- `x2`: 286-atom boxes at 300 / 450 K.
+- `swapall` / `swapemc`: carbonyl↔ether rigid swaps of the solvent bound to Li⁺, for energy-difference ordering (see §12).
+
+**Arms:** strain norm 0.03 / 0.06 / 0.12 / 0.20 × orthorhombic or general, 4 seeds each. All are dose-matched: 441 MD frames plus 399 scan frames with the isotropic `scan` arm's per-scale counts (`scripts/make_strain_arms.py`). `fresh` and `scan` have 2 seeds. Seed means below; full tables in `logs/strain_ladder_summary.md`, raw output in `logs/eval/`.
+
+| metric (forces meV/Å, E meV/atom, swap ΔE meV) | fresh | g03 | gen (0.06) | g12 | **g20** | g20 vs fresh | g20 vs g12 |
+|---|---|---|---|---|---|---|---|
+| test MD trans | 22.4 | 20.9 | 19.7 | 19.1 | **18.0** | −20 % | −6 % |
+| test MD intra | 89.7 | 95.2 | 93.9 | 92.2 | **86.9** | −3 % | −6 % |
+| test MD E | 2.13 | 2.09 | 2.00 | 1.92 | **1.61** | −24 % | −16 % |
+| uniax trans | 44.1 | 33.1 | 30.1 | 23.5 | **21.3** | −52 % | −9 % |
+| shear trans | 26.2 | 21.8 | 20.4 | 19.4 | **18.5** | −29 % | −5 % |
+| shift E | 1.42 | 1.34 | 1.50 | 1.49 | **0.96** | −32 % | −36 % |
+| x2 E | 1.77 | 2.12 | 2.18 | 1.84 | **1.45** | −18 % | −21 % |
+| swap ΔE, all | 309 | 280 | 254 | 193 | **159** | −49 % | −18 % |
+| swap ΔE, EMC/DMC (Kendall τ) | 1219 (0.75) | 980 (0.82) | 911 (0.85) | 696 (0.90) | **502 (0.92)** | −59 % | −28 % |
+
+The orthorhombic ladder follows the same trend: test MD trans 21.9 / 20.5 / 21.0 / 18.2; uniax trans 33.8 / 30.4 / 26.8 / 22.8.
+
+**Reading:**
+- **Strain size is the main knob, and there is no turnover yet.**
+  - Errors fall from 0.03 to 0.20 on every test set, including unstrained MD and the swap pairs.
+  - At 0.20 the rigid scans beat fresh MD even on intramolecular forces (86.9 vs 89.7), which no smaller strain did.
+- **Larger strain acts as a regulariser** (`figs/loss_strain_ladder.png`).
+  - Final training loss rises with strain: g03 0.0146, gen 0.0154, g12 0.0173, g20 0.0207.
+  - Validation loss falls: 0.117, 0.107, 0.102, 0.091.
+  - g03's validation loss creeps up after epoch 125.
+- **General vs orthorhombic** (same-seed differences, gen − ortho, mean ± sd over 4 seeds):
+  - At 0.03: nothing.
+  - At 0.06 and 0.12: general is ~1–3 meV/Å better on translational force. The sign is consistent but only 1–2 sd (uniax at 0.12: −3.25 ± 1.55).
+  - At 0.20: translational is equal, and general is better on intramolecular force by ~4 meV/Å on every test set (MD: −4.05 ± 0.33).
+  - So general ≥ orthorhombic, but strain size matters far more than strain type.
+- **Confound at 0.20: source-frame diversity.**
+  - At 0.20 most compressed frames fail the 1.5 Å contact check (5–7 % survive). The pools were oversampled: every 2nd MD frame, plus an extra compressed-only pass with 6 strains per frame.
+  - As a result, the 399 g20/o20 scan frames come from **236 / 229 distinct MD frames, vs 147** for every arm at ≤ 0.12.
+  - The surviving compressed frames are also a selected subset: strain directions that happen to avoid close contacts.
+  - A g12/o12 rebuilt from the same oversampled source set is the control that separates strain size from diversity. Not run yet.
+
+**Error structure** (`figs/err_stress_uniax.png`, `figs/err_stress_md.png`; seed 1, error vs teacher value, slope of the linear fit):
+
+| arm (uniax test) | trans RMSE / slope | rot RMSE / slope | Li⁺ trans slope |
+|---|---|---|---|
+| fresh | 37.8 / −0.139 | 33.4 / −0.193 | −0.005 |
+| gen | 30.4 / −0.068 | 25.1 / −0.118 | +0.044 |
+| g12 | **25.6 / −0.045** | **18.7 / −0.067** | −0.003 |
+| gen, λ = 1e3 | 29.2 / −0.074 | 23.5 / −0.102 | +0.010 |
+
+- Shrinkage toward the mean falls with strain size. That is consistent with slope = −Var(ε)/Var(y): larger strains widen the target range and reduce the error at the same time.
+- The Li⁺ "too stiff" slope seen with `gen` vanishes at 0.12. Intramolecular errors show no structure for any arm (slope ≈ −0.01).
+
+**A mechanism to test.**
+- Intramolecular forces are ~1 eV/Å, against ~50–70 meV/Å for the translational and rotational parts. The intermolecular part is therefore ~0.5 % of the force MSE.
+- Compressive strain pushes contacts into the repulsive wall, which makes intermolecular forces large and raises their share of the loss. It also pins the curvature of the intermolecular PES.
+- The test: up-weight the translational and rotational components in the loss with no extra strain.
+
+### 10. Pairwise energy-difference loss under stress (2026-10-23)
+
+**λ sweep** (random batches of 4, `gen` data; 3 seeds, λ = 0 has 4):
+
+| λ | test MD E | shift E | x2 E | test MD trans / intra | x2 trans | swap ΔE (all) | scan-family ΔE |
+|---|---|---|---|---|---|---|---|
+| 0 | 2.00 | 1.50 | 2.18 | 19.7 / 93.9 | 15.9 | 254 | 1.13 |
+| 150 | 1.81 (−10 %) | 1.15 (−23 %) | 1.56 (−28 %) | 19.6 / 94.1 | 16.5 | 266 | 1.04 |
+| **1e3** | **1.64 (−18 %)** | **0.78 (−48 %)** | **1.19 (−45 %)** | 20.6 / 93.7 | 18.1 | 270 | **0.99** |
+| 3e3 | 1.94 | 1.11 | 1.31 | 20.3 / 97.8 | 19.8 | 321 | 1.04 |
+| 1e4 | 1.97 | 0.98 | 1.84 | 22.6 / 103.6 | 22.3 | 328 | 1.08 |
+
+- **λ = 1e3 is the sweet spot.** Energies improve most where the model extrapolates (composition/temperature shift, 2× boxes). The force cost is small on test MD (+5 % translational) and larger on x2 (+14 % translational). Above 1e3, forces degrade.
+- **Validation (MD + scan frames from the training distribution) did not see any of this:** val E at λ = 1e3 equals λ = 0. Judge this loss on held-out shifted data only.
+- **It does not help the carbonyl↔ether swap ΔE** (270 vs 254 meV), so it is not a fix for the ordering problem by itself.
+
+**Batch size** (2 seeds, λ = 0 / 3e3; fixed 200 epochs):
+- Batches of 8 and 16 are much worse on forces: test MD trans 31–32 vs 19.7, intra 104–114 vs 94. This is confounded by 2–4× fewer optimiser steps.
+- λ = 3e3 does lower energies at larger batches: test MD E 2.62 → 1.94 at bs 8 and 2.49 → 1.99 at bs 16. More pairs per batch give the term more to work with.
+
+**Batch composition** (pbp batching, 2 seeds; test MD trans / rot / intra / E):
+
+| batching | trans | rot | intra | E |
+|---|---|---|---|---|
+| bucket by pair count (density), λ = 0 | 20.9 | 14.0 | 93.3 | 1.96 |
+| bucket by pair count, λ = 150 (`genroll_pbp`) | 19.6 | 13.4 | 93.0 | 1.85 |
+| bucket by atom count (composition), λ = 0 | 22.9 | 14.4 | 93.4 | 2.24 |
+| bucket by atom count, λ = 3e3 | 20.9 | 13.9 | 95.5 | 1.83 |
+
+- **No batching mode beats random batches.** pbp is ~3× slower per epoch (no scanned epoch).
+- `bucket_by: atoms` is a new option in the apax worktree, not upstream.
+
+The loss itself is upstream in apax `model-and-perf-improvements` (`d8787dc9`, `"pairwise_mse"`, with a test).
+
+### 11. Cutoff and tensor channels: 2 × 2 (2026-10-23)
+
+`r_max` 5 / 6 Å × `n_radial_tensor` 5 / 6, for `fresh`, `scan`, `gen`, `genroll`, 2 seeds each (`scripts/job_r6.sh`, `scripts/job_rx.sh`). The table averages over the four arms (variant = cutoff / tensor channels); full tables in `logs/cutoff_tensor_summary.md`.
+
+| metric | 5 / 5 | 5 / 6 | 6 / 5 | 6 / 6 |
+|---|---|---|---|---|
+| test MD trans | 21.2 | 21.5 (+1 %) | **19.1 (−10 %)** | 19.2 (−9 %) |
+| test MD intra | 93.5 | 93.7 (0 %) | 91.5 (−2 %) | **89.5 (−4 %)** |
+| test MD E | 2.07 | 2.09 (+1 %) | **2.03 (−2 %)** | 2.12 (+2 %) |
+| uniax trans | 35.6 | 36.2 (+2 %) | 31.3 (−12 %) | **31.1 (−13 %)** |
+| swap ΔE (all) | 276 | 265 (−4 %) | 235 (−15 %) | **227 (−18 %)** |
+| shift E | 1.39 | 1.62 (+17 %) | **1.07 (−23 %)** | 1.22 (−12 %) |
+
+- **The 6 Å cutoff does the work.** The extra tensor channel does nothing at 5 Å.
+- **At 6 Å the extra tensor channel buys ~2 % on intramolecular force but costs energy** (+14 % shift E vs 6 / 5). Training loss drops 21–28 % with it, so it is extra capacity that overfits energies (`figs/loss_cutoff_tensor.png`).
+- **Best single model: `genroll` at 6 / 5:** test MD E 1.73, x2 E 1.15 (vs 1.74 at 5 / 5), uniax trans 28.1.
+- **Scans still beat fresh off equilibrium at 6 Å** (uniax trans 28.9 vs 36.1). On equilibrium MD, fresh at 6 / 5 has the lowest translational error (18.2).
+- **Recommended default:** `r_max` 6, `n_radial_tensor` 5, plus the pairwise loss. Cost is ~+20 % per epoch (1.1 vs 0.9 s).
+
+### 12. The swap test set is too easy
+
+- The rigid carbonyl↔ether swaps change the teacher energy by **1.8 eV on average (3.4 eV for EMC/DMC)**. Every model gets the sign right on every pair.
+- They still rank models, through ΔE error and Kendall τ, but they do not test the small differences between binding modes that motivated this study.
+- A real ordering test needs teacher-relaxed swap pairs, or pairs selected for |ΔE| below ~50 meV.
+
+### Next
+- **Strain size vs source-frame diversity:** g12 / o12 built from the oversampled 0.20 source set (~230 MD frames), 4 seeds.
+- **Push the strain further:** 0.30, to find the turnover.
+- **Combine the winners:** g20 + λ = 1e3 at `r_max` 6 / `n_radial_tensor` 5.
+- **Loss-share mechanism:** a force loss with up-weighted translational and rotational components, without extra strain.
+- **Batch size at matched optimiser steps.**
+- **A small-ΔE ordering test set:** relaxed carbonyl / ether Li⁺ pairs.
+- **Student MD vs teacher MD Li⁺ solvation** (`scripts/solvation.py`).
 
 ### Bugs hit along the way (kept for the record)
 - `Atoms.copy()` drops the attached SinglePointCalculator. The first `dup` build had 399 unlabelled frames and crashed apax's shift statistics. Fixed by reusing the labelled source objects.
 - packmol from Python needs a seekable stdin (a file, not a pipe).
 - molify `compress(freeze_molecules=True)` needs unwrapped input (see above).
+- **Silent eval failure:**
+  - `eval_model.sh` ran `$P script.py` with `P` a bash array, which expands to its first element only (`taskset`). It also piped the output through `grep -v warn`, which hid the exit code.
+  - All 61 evals "succeeded" while running nothing.
+  - Fixed with `"${P[@]}"`, and the script now checks each log for its result table and exits non-zero if it is missing.
+  - Queued batches are now watched by `scripts/qwatch.py`, which exits on the first failure, on completion, or when overdue.
+- **Short scan pools:** at 0.12 the contact rejection left one scale's pool 3 frames short. `make_strain_arms.py` now tops up with repeats (≤ 3 of 399) and reports it.
+- **pueue daemon in an agent shell's process group:** a low-memory reaper killed that group and took the daemon down mid-run. Start it with `setsid -f pueued -d`.
 
-Raw evaluation output: `logs/arms_eval_raw.md`. Training logs: `logs/log_arm_*.csv`.
+Raw evaluation output: `logs/arms_eval_raw.md`, `logs/eval/` (one file per model × test set). Summaries: `logs/strain_ladder_summary.md`, `logs/stress_summary.md`, `logs/cutoff_tensor_summary.md`. Training logs: `logs/log_arm_*.csv`.

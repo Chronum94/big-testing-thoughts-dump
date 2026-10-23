@@ -1,0 +1,11 @@
+model models/arm_gen_r5t6_s2, 336 frames. Force-component RMSE in meV/A (rel = RMSE / RMS of the teacher component)
+| molecule | n atoms | trans RMSE (rel) | rot RMSE (rel) | intra RMSE (rel) | teacher RMS trans / rot / intra |
+|---|---|---|---|---|---|
+| all | 47796 | 14.7 (0.27) | 11.6 (0.26) | 89.4 (0.09) | 54 / 44 / 1030 |
+| DMC | 1008 | 12.2 (0.30) | 15.5 (0.30) | 86.8 (0.07) | 41 / 52 / 1160 |
+| EC | 10080 | 11.2 (0.26) | 14.1 (0.27) | 97.4 (0.09) | 43 / 51 / 1089 |
+| EMC | 34020 | 8.4 (0.24) | 10.4 (0.26) | 81.8 (0.08) | 34 / 40 / 1021 |
+| Li | 336 | 134.0 (0.30) | – | – | 448 / 0 / 0 |
+| PF6 | 2352 | 14.9 (0.24) | 15.0 (0.23) | 147.2 (0.16) | 62 / 64 / 907 |
+
+MD frames: per-atom E error mean +0.67, MAE 1.41 meV/atom (n=336)
