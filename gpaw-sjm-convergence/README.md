@@ -15,6 +15,11 @@ Constant-potential SJM runs an outer root-find on the excess electron count N, a
 - **Keeping the MSR1 mixer history across N updates is a trap.** Naive keeping is 1.4–4× worse. Re-anchoring the secants is harmless but gives nothing. The cost per outer step comes from the N perturbation itself, not from lost mixer memory.
 - **Every benchmark cell is a single run** (one target, one starting N). Path dependence of the outer loop moves totals by up to ±50%. A robustness sweep is still to do.
 - **The benchmark jellium is only 0.79 Å thick.** It is the GPAW test geometry: top at 14.5 Å in a 15 Å cell, bottom at top atom + 3 Å. All numbers here refer to that setup.
+- **For the outer root-find, anchor the multisecant on the current point and weight it by measurement noise.** An offline comparison of seven 1D root-finders on φ(N) curves from our own data (section 12) found:
+  - classic higher-order methods (inverse quadratic interpolation, Sidi) are fastest with clean data, but fail in up to 2/3 of runs once inexact-SCF noise is added;
+  - the anchored, noise-weighted multisecant (linear, or inverse-quadratic when the curvature is resolvable) never failed;
+  - it is about 1.7× faster than master on a synthetic semiconductor, and equal or better on the metals.
+  Precise definitions of every method and term are in [`METHODS.md`](METHODS.md).
 - **Hard systems haven't been tried yet.** A merged, ranked list from three research agents is in [`HARD_CASES.md`](HARD_CASES.md): Γ-only metals, spill-out, graphene, low-density metals, semiconductors, spin, explicit water, elongated cells.
 
 ## Requirements / where things are
@@ -275,10 +280,99 @@ converged when   max_side ptp(W_{j−2..j}) < max(τ_wf, η·|φ_j − φ*|)
 - Loose iterations are cheaper in wall time: about 0.52 s vs about 0.6 s per iteration. The cause is untested; probably less eigensolver work.
 - The final tight reconvergence from a coarse state is now the biggest single cost (3–34 iterations).
 
-## 10. Ideas discussed but not done
+## 10. Plane-wave mode
+
+SJM runs only on real-space grids (FD, and LCAO, whose Hamiltonian also lives on a grid).
+- **Old GPAW:** `create_hamiltonian` raises `NotImplementedError` for PW (`sjm.py:1185`), and so does the parent solvation calculator.
+- **New GPAW:** `gpaw.new` SJM raises `NotImplementedError` in every mode. Some PW pieces exist (`ConjugateGradientPoissonSolver` with dielectric and dipole layer, an unused Fourier-space sawtooth solver, `FixedPotentialJelliumExtension`). Plain implicit solvation does work in `gpaw.new` PW mode (commit `35151cbc5d`).
+- **Everything in this log is FD.**
+
+## 11. Gapped electrodes, and using the DOS
+
+**Why gapped electrodes are hard.** With E_F in the gap, the carriers are the smearing tails of the band edges:
+
+```
+N(φ) ∝ exp(±φ/σ),     φ(N) ≈ φ0 ∓ σ ln(N/N0),     C ≈ C_q ≈ N/σ
+```
+
+So the slope dφ/dN ≈ −σ/N changes by orders of magnitude.
+- Secant steps undershoot from one side and overshoot into the wrong band from the other.
+- A 4-point regression averages slopes that differ by about 100×.
+- Deep in the gap the required N falls below SCF noise, so there is no usable root. (A thin slab has no real space-charge layer anyway, so this is a stress test, not physics.)
+
+**What the DOS can and can't do as a first guess.**
+- C_q = DOS(E_F) is already in the slope estimate (section 3).
+- For metals the DOS alone is useless: Au has C_q ≈ 1100 µF/cm² against a total of about 34, so a DOS-only step would overshoot about 30×.
+- For gapped and low-DOS electrodes the DOS is the right first guess. What matters there is the DOS *shape*, not the single value at E_F.
+
+**Proposed rigid-band predictor** (not implemented):
+
+```
+ΔN = Σ_kn w_k [f(ε_kn − μ0 − Δμ) − f(ε_kn − μ0)]   → Δμ(ΔN)  (monotone 1D root)
+Δφ_pred(ΔN) = −ΔN/C_dl − Δμ(ΔN)
+```
+
+Solving Δφ_pred(ΔN) = φ* − φ0 gives N for the target, or, the other way round, the voltage for a target N.
+- It reduces to the current step for metals.
+- It reproduces the exponential/band-edge behaviour, the √N of graphene and k-point staircases.
+- It also says when a target needs a ΔN below noise level, i.e. when to stop.
+- It misses band changes that depend on N (adsorbate level crossings, spin flips, polarons).
+
+Combined with section 12, the plan is: keep the band filling exact (DOS), and learn only the near-linear electrostatic part (C_dl) from the measured points with the anchored weighted fit.
+
+## 12. Offline comparison of 1D root-finders (`scripts/rootfind_sim.py`)
+
+**Question:** in 1D, can several previous points help, as in multisecant mixers?
+- With a *linear* model, extra points only average noise. A single secant already fixes the line.
+- Extra history therefore pays off only through a nonlinear model: Muller, inverse quadratic interpolation (IQI), inverse polynomial interpolation, Sidi's method, with orders 1.84 to 2 vs the secant's 1.62.
+
+**Test (no DFT).** Simulated outer loops on φ(N) curves from our own data:
+- Au and Pt: constant-charge sweeps, splined;
+- Cu: cubic fit through tightly converged log points;
+- a synthetic semiconductor: φ0 − σ·asinh(N/N_s) − N/C_dl, with σ = 0.05, N_s = 1e-6, C_dl = 0.15 e/V;
+- the same first slope for every method (0.65× the true capacitance);
+- Gaussian noise: 1 mV for tight SCFs, or max(1 mV, 0.1·|f|) for inexact ones;
+- 300 seeds.
+
+Methods and noise model are specified exactly in `METHODS.md`.
+
+Evaluations to |φ − φ*| < 0.01 V, as median / 90th percentile / failures out of 300 (the failure count is omitted when zero):
+
+| method | Au | Pt | Cu | semi, conduction band | semi, band edge |
+|---|---|---|---|---|---|
+| **tight SCF** | | | | | |
+| master (regress + mix) | 4/4 | 6/6 | 5/5 | 18/18 | 17/18 |
+| branch (weighted, replace guess) | 3/3 | 5/5 | 6/6 | 16/16 | 17/17 |
+| anchored linear | 3/3 | 5/5 | 5/6 | 10/10 | 11/11 |
+| anchored inverse-quadratic | 3/3 | 5/5 | 4/4 | 9/9 | 9/9 |
+| IQI (3-point) | 3/3 | 5/5 | 4/4 | 7/7 | 7/7 |
+| Sidi k=2 | 3/3 | 5/5 | 4/4 | 9/9 | 8/10 |
+| Sidi k=3 | 3/3 | 5/5 | 4/4 | 11/12 | 12/12 |
+| **inexact SCF (η = 0.1)** | | | | | |
+| master | 5/6 | 7/8 | 6.5/8 | 19/20 | 19/20 |
+| branch | 5/6 | 7/8 | 7/8 | 18/20/6 | 18/19/1 |
+| anchored linear | 5/6 | 6/8 | 7/8 | 11/12 | 11/12 |
+| anchored inverse-quadratic | 6/7 | 7/8 | 7/8 | 11/13 | 10/12 |
+| IQI | 6/9 | 8/13/5 | 7/12/2 | 11/17/20 | 10/16/17 |
+| Sidi k=2 | 6/7 | 7/10 | 7/9 | 16/19/30 | 15/20/26 |
+| Sidi k=3 | 6/7 | 7/11/5 | 7/10/5 | 19/21/190 | 18/21/141 |
+
+Figures: `figs/rootfind_sim.png` (all methods, both noise levels) and `figs/rootfind_anchored_tight.png` (tight SCF; master, branch, the anchored methods).
+
+- **Clean data:** curvature-aware methods save 1–2 evaluations on curved Cu and about half on the semiconductor. Au and Pt are nearly linear, so there is nothing to gain.
+- **Noisy data:** exact interpolation through noisy, clustered points amplifies the noise. IQI and Sidi fail often: Sidi k=3 fails 190 of 300 semiconductor runs.
+- **The anchored weighted methods never failed.** The anchoring and weighting matter more than the curvature term.
+- **The branch's remaining 0.5 slope mixing costs it on Cu** (6 vs master's 5).
+- **Every method shares the semiconductor's slow start** of about 6 evaluations, from a first slope that is orders of magnitude off. That is the job of the rigid-band predictor (section 11).
+- **Caveats:** model curves (Pt starts at N = 0, outside its sweep, by linear extrapolation); unbiased Gaussian noise; evaluation counts, not cost.
+
+## 13. Ideas discussed but not done
 
 - **Inexact multisecant Newton / grand-canonical SCF.** Solve for x = (n, N) jointly, with residual (R(n,N), w·(φ−φ*)), updating N every few SCF iterations. Precondition the N component with C_est from section 3. Gate N updates until the density residual is below about 10⁻²·⁵, because early-SCF φ swings by 1–10 eV. Then optionally put N into the MSR1 vectors. This follows from section 8: the cost is the size of the N jump, so many small jumps should beat a few large ones.
 - **Promote the adaptive criterion (section 9) into `sjm.py`**, replacing the scaled-tolerance `inexact_newton`.
+- **Replace the regression + slope mixing** in the outer loop with the anchored weighted multisecant (section 12). Use the inverse-quadratic term only when the curvature is resolvable.
+- **Rigid-band DOS predictor** (section 11), for the first step and as the band-filling part of the model.
+- **MSR1-style step control** (a trust region with acceptance ratio, noise-aware bad-step limits, a bracket with an Illinois fallback). Discussed, then parked by choice; see `METHODS.md`.
 - **A robustness sweep:** 3 targets × 3 starting N × 3 metals × methods, to get distributions instead of single runs.
 - **Hard test systems:** see `HARD_CASES.md`. Key warnings from it:
   - An unconverged inner SCF poisoning the outer step is the most-reported real failure, and it is exactly the risk our inexact and adaptive schemes take.
@@ -293,6 +387,7 @@ converged when   max_side ptp(W_{j−2..j}) < max(τ_wf, η·|φ_j − φ*|)
 - `scripts/sweep.py`, `check_legendre.py`: Legendre validation.
 - `scripts/induced*.py`, `estim.py`: induced-charge and capacitance-model diagnostics.
 - `scripts/plot_convergence.py`, `plot_keep.py`: figures.
+- `scripts/rootfind_sim.py`, `plot_anchored_tight.py`: offline root-finder comparison (runs in seconds, no DFT).
 - `scripts/relax.py`, `anchor_check.py`: relaxation and anchoring checks.
 - `data/results.jsonl` (all runs since the harness rewrite), `results_old.jsonl` (the first runs), `results_table.md`, `sweep_*.json`, `induced*.txt`.
 - `logs/gpaw_txt_logs.tar.gz`: all GPAW text logs.
