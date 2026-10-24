@@ -441,8 +441,34 @@ Full tables in `logs/pw2_summary.md`.
   - More pairs per batch (B² growth) strengthen it: −3 % energy at batch 4, −20–26 % at batches 8–16.
   - Carbonyl vs ether binding is a within-composition difference, so it is the wrong tool for the ordering question.
 
+### 14. Large batches at matched optimiser steps (2026-10-23)
+
+Batch 16 on the `gen` data, trained for 800 epochs so it gets as many optimiser steps as batch 4 for 200 epochs. The cosine period (200 → 800 epochs) and the EMA start (100 → 400) are scaled to match in steps; the EMA updates every step. Three variants (`scripts/job_bs.sh`, configs `arm_gen_bs16_e800_*`), 3 seeds each, compared on seeds 1–3:
+
+| arm | MD trans / intra | MD E | uniax trans | shift E | x2 E | swap ΔE |
+|---|---|---|---|---|---|---|
+| batch 4, 200 ep (reference) | 19.3 / 94.5 | 2.00 | 29.7 | 1.43 | 2.10 | 256 |
+| batch 16, 200 ep (4× fewer steps) | 32.3 / 112.5 | 2.49 | 44.6 | 1.36 | 3.45 | 292 |
+| batch 16, 800 ep (matched steps) | 27.4 / 104.6 (+42 % / +11 %) | 1.94 | 46.3 (+56 %) | 1.15 | 1.92 | 274 |
+| batch 16, 800 ep, all LRs ×2 (√4 scaling) | 21.3 / 99.4 (+10 % / +5 %) | 2.31 (+16 %) | 39.2 (+32 %) | 2.07 (+45 %) | 2.41 (+15 %) | 321 |
+| batch 16, 800 ep, pairwise λ = 3e3 | 23.5 / 104.0 (+22 % / +10 %) | **1.75 (−13 %)** | 33.9 (+14 %) | **0.88 (−38 %)** | **1.71 (−19 %)** | 253 |
+
+- **Step count explains part of the large-batch force gap, not all of it.**
+  - Matching steps cuts the test-MD translational penalty from +67 % to +42 %.
+  - Uniaxial forces do not improve at all (44.6 → 46.3), so a real generalization gap remains off equilibrium.
+- **√-scaled learning rates (Muon and the other LRs ×2) recover most of the equilibrium force accuracy** (MD +10 %, x2 forces at the reference). They raise energy errors by 15–45 % and still miss on uniaxial (+32 %).
+- **The pairwise loss is the best large-batch arm:**
+  - the best energies of any arm here, including the batch-4 reference;
+  - it partly fixes the off-equilibrium forces (uniax 46.3 → 33.9 at the same LR);
+  - swap ΔE matches the reference.
+  - With 120 pairs per batch, the term has much more to compare.
+- **No speed gain on this GPU:** batch 16 takes 0.53 s/epoch vs 0.98 s for batch 4, so matched steps take 2.2× the wall time.
+
+Full tables in `logs/bs_summary.md`.
+
 ### Next
-- **Running:** batch 16 at matched optimiser steps (800 epochs, cosine period and EMA start scaled), with λ = 0 / 3e3 and with √4-scaled learning rates; 3 seeds each (`runs_bs.txt`). It asks whether the large-batch force gap is a real generalization gap or just 4× fewer optimiser steps under Muon.
+- **Running:** the best recipe (g20, 6 Å / 5 tensor channels, λ = 1e3) without the cosine radial cutoff (`radial_cutoff: none`, apax branch `optional-cutoff`); 4 seeds. The Kocer Bessel basis is already zero with zero slope at r_max, so the cutoff is redundant for smoothness and only damps the 3–6 Å shell further.
+- **Batch 16 with LR ×2 and λ = 3e3 together:** the LR fixes forces and the pairwise term fixes energies; check whether they stack.
 - **Energy weight ×25 without pairwise vs pairwise λ = 1e3:** is the pairwise term more than "energy weight minus the batch-mean part"?
 - **Push the strain further:** 0.30, to find the turnover.
 - **Loss-share mechanism:** a force loss with up-weighted translational and rotational components, without extra strain.
