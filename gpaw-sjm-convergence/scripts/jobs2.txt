@@ -1,0 +1,4 @@
+base_Pt45 4.5 0.0 element='Pt'
+est_Pt45 4.5 0.0 element='Pt'
+base_Cu40 4.0 0.0 element='Cu'
+est_Cu40 4.0 0.0 element='Cu'

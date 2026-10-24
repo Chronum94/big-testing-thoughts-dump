@@ -1,0 +1,6 @@
+loose_Au40 4.0 0.0 tol=0.1 energy_correction=True
+loose_Pt45 4.5 0.0 element=Pt tol=0.1 energy_correction=True
+looseinx_Au40 4.0 0.0 tol=0.1 energy_correction=True inexact_newton=0.1
+looseinx_Pt45 4.5 0.0 element=Pt tol=0.1 energy_correction=True inexact_newton=0.1
+loose05_Au40 4.0 0.0 tol=0.05 energy_correction=True
+loose05_Pt45 4.5 0.0 element=Pt tol=0.05 energy_correction=True

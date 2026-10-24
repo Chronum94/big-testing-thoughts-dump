@@ -1,0 +1,6 @@
+inx1_Au40 4.0 0.0 inexact_newton=0.1
+inx1_Pt45 4.5 0.0 element=Pt inexact_newton=0.1
+inx1_Cu40 4.0 0.0 element=Cu inexact_newton=0.1
+inx05_Au40 4.0 0.0 inexact_newton=0.05
+inx05_Pt45 4.5 0.0 element=Pt inexact_newton=0.05
+inx05_Cu40 4.0 0.0 element=Cu inexact_newton=0.05
