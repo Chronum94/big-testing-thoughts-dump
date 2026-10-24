@@ -466,14 +466,94 @@ Batch 16 on the `gen` data, trained for 800 epochs so it gets as many optimiser 
 
 Full tables in `logs/bs_summary.md`.
 
+### 15. Dropping the cosine radial cutoff (2026-10-23)
+
+- **Motivation:** the Kocer Bessel basis f_n = a(−1)^n [sinc((n+1)r/r_c) + sinc((n+2)r/r_c)] already reaches zero with zero slope at r_c (`figs/bessel_basis.png`). So the cosine cutoff adds no smoothness and only damps the 3–6 Å shell further.
+- **Change:** apax branch `optional-cutoff` adds `radial_cutoff: cosine | none`. `none` zeroes only pairs beyond r_max (neighbour-list skin pairs), and is allowed for the Bessel basis only.
+- **Run:** the best recipe (g20, 6 Å / 5 tensor channels, λ = 1e3), 4 seeds each (`logs/nocut_summary.md`).
+
+| test set | trans: cutoff → none | intra | E |
+|---|---|---|---|
+| MD | 16.2 → 18.5 (+14 %) | 85.5 → 85.0 | 1.57 → 1.70 (+8 %) |
+| uniax | 19.5 → 22.6 (+16 %) | 94.1 → 93.7 | 1.48 → 1.62 (+9 %) |
+| shear | 16.5 → 18.5 (+12 %) | 86.9 → 85.8 | 1.56 → 1.68 |
+| shift | 11.5 → 12.1 (+5 %) | 78.9 → 77.5 | 0.86 → 0.82 |
+| x2 | 14.2 → 15.4 (+8 %) | 86.6 → 85.8 | 0.80 → 0.84 |
+| swap ΔE all / EMC | 155 → 171 / 508 → 551 | | |
+
+**Every intermolecular metric gets worse without the cutoff; only intramolecular forces improve slightly.**
+- One possible explanation (untested): the cutoff acts as a prior that the outer shell matters little. Without it, the model spends capacity on the weak, noisy 4–6 Å information.
+- **Keep the cosine cutoff.**
+
+### 16. Tabulated radial functions for inference, and MD with them (2026-10-23/24)
+
+The trained radial of each element pair is a smooth 1-D function of distance. apax branch `radial-tabulation` (`apax/layers/descriptor/radial_table.py`) adds `TabulatedRadialFunction`, built by sampling any trained radial through its public `apply` and injected through `ModelBuilder(..., radial_fn=...)`, plus an MD option `radial_table`. Backends:
+- `pair_table`: exact. The model's own basis with one coefficient matrix per element pair, recovered by least squares.
+- `hermite`: cubic Hermite grid.
+- `piecewise`: odd-degree Hermite pieces, C^m.
+- `chebyshev`: global expansion.
+
+How many grid points are needed (worst case over 36 element pairs × 17 channels; `figs/interp_vs_cheb.png`, `figs/table_pareto.png`):
+- Hermite reaches fp32 precision at about 512 nodes.
+- Chebyshev at about 32–36 coefficients (exponential convergence).
+- Piecewise degree 7 × 16 intervals or 5 × 32 at about 1e-5.
+
+**Force calls on the GPU** (RX 9070 XT, trained g20 6 Å model, energy + forces, 7,722 / 18,304 atoms; `logs/bench_radial_gpu_v2.log`):
+
+| radial | ms per call | vs exact | max \|ΔF\| (meV/Å) |
+|---|---|---|---|
+| exact (factorized, as trained) | 10.5 / 22.3 | — | — |
+| exact + sine recurrence for the Bessels | 12.5 / 23.4 | 0.84–0.95× | 0.007 |
+| **pair_table (exact)** | **8.0 / 17.3** | **1.29–1.31×** | 0.005 |
+| **Hermite 256** | **7.2 / 16.1** | **1.38–1.45×** | 0.08 |
+| piecewise 7 × 16 | 7.6 / 16.7 | 1.34–1.38× | 0.05 |
+| Chebyshev 32 | 14.7 / 30.3 | 0.71–0.73× | 0.01 |
+
+- **Most of the gain is exact:** the factorized contraction's P × rank × n_radial intermediate (22 MB per training step in the XLA dump) was the cost, not the Bessel functions.
+- The sine recurrence is slower on the GPU.
+
+**NVE MD, 7,722 atoms, 10 ps, dt 0.5 fs, real masses** (`md_radial/`, `scripts/nve_drift.py`):
+
+| radial | µs per atom-step | vs exact | drift (meV/atom/ps) | E_tot std (meV/atom) |
+|---|---|---|---|---|
+| exact | 2.94 | — | −0.0013 | 0.0042 |
+| pair_table | 2.43 | 1.21× | −0.0012 | 0.0041 |
+| Hermite 256 | 2.28 | 1.29× | −0.0013 | 0.0042 |
+| piecewise 7 × 16 | 2.57 | 1.14× | −0.0012 | 0.0039 |
+
+- **Energy conservation is identical for all four.** Forces are the exact gradient of the tabulated energy, so the approximation does not break conservation.
+- MD speedups are smaller than force-call speedups because the neighbour list, integrator and output are unchanged.
+- A neighbour-list skin benchmark showed the 0.5 Å skin is fastest. Extra pairs cost more than the rebuilds they save, so rebuilds are not the bottleneck.
+
+**Observables** (`scripts/observables.py`, `figs/obs_nve.png`, `figs/obs_small.png`):
+- **7,722-atom NVE (7 ps after equilibration):** the Li⁺–O carbonyl / ether / F RDFs overlap for all four variants. The carbonyl fraction of Li–O contacts is 0.70–0.71 everywhere, coordination numbers agree within ±3 %, pressure within ±1 %, and the VACF / VDOS and shear-stress ACF overlap. Diffusion estimates scatter by up to 20 %, but the MSD reaches only about 5 Å² in 3.5 ps (still caged), so they are not resolvable.
+- **151-atom training box, NVT 200 ps at 330 K, dt 1 fs, H mass 4:** two *exact* runs that differ only in seed give carbonyl fractions of 0.70 vs 0.87 and Li⁺ D differing 4×. With 2 Li⁺ and solvation shells that rearrange on roughly ns timescales, each run stays near its initial shell. Every table run falls within this noise, so the small box cannot resolve the comparison.
+- **Stability:** 7,722 atoms at dt 2 fs with H mass 4 ran 60 ps cleanly for one seed and hit a NaN at about 38 ps for the other, with no heating or bond breaking in the saved frames before it. dt 1 fs ran 4 × 200 ps cleanly.
+
+**Conclusion:**
+- The tables reproduce forces to ≤ 0.1 meV/Å (about 200× below the model's own error vs the teacher) and conserve energy identically, so trajectories are statistically equivalent by construction.
+- `pair_table` gives 1.21× in MD with no approximation, and the same element-pair form is the fix for training (it removes the factorized intermediate).
+- Hermite adds about 6 % more in MD.
+- Piecewise and Chebyshev do not earn their place on these numbers.
+
+### 17. apax / znh5md trajectory-file bugs found along the way
+
+1. **apax `io.py`:** the trajectory `Atoms` carried momenta without masses, so stored velocities were momenta / ASE default masses, wrong for any custom masses (4× too large for H at 4 amu, a factor of ~8 in a recomputed temperature).
+2. **apax `simulate.py`:** the H5 writer got `dt` as its time step, but frames are written every `sampling_rate` steps, so stored times were `sampling_rate` × too small.
+3. **znh5md (0.4.8 and current main):** with `store="time"`, `step`/`time` lag `value` by the last `extend()` batch (900 vs 1000 frames). Readers that size by `step` drop the last buffer. The cause is in `extend_group()` resizing to the pre-batch length.
+
+- Fixes 1–2 are on apax branch `fix-h5md-masses-time` with tests.
+- A minimal example and suggested patch for 3 are written up for an upstream issue.
+- Other unit gotchas: apax `stress` is dE/dε (stress × volume, eV), and velocities are in ASE units (not Å/fs).
+
 ### Next
-- **Running:** the best recipe (g20, 6 Å / 5 tensor channels, λ = 1e3) without the cosine radial cutoff (`radial_cutoff: none`, apax branch `optional-cutoff`); 4 seeds. The Kocer Bessel basis is already zero with zero slope at r_max, so the cutoff is redundant for smoothness and only damps the 3–6 Å shell further.
+- **Student vs teacher Li⁺ solvation:** carbonyl vs ether O, RDFs and diffusion from the best model vs PET-MAD MD on the 7,722-atom box (54 Li⁺) or several replicas. This is the observable-level question the project is about.
 - **Batch 16 with LR ×2 and λ = 3e3 together:** the LR fixes forces and the pairwise term fixes energies; check whether they stack.
 - **Energy weight ×25 without pairwise vs pairwise λ = 1e3:** is the pairwise term more than "energy weight minus the batch-mean part"?
 - **Push the strain further:** 0.30, to find the turnover.
 - **Loss-share mechanism:** a force loss with up-weighted translational and rotational components, without extra strain.
 - **A small-ΔE ordering test set:** relaxed carbonyl / ether Li⁺ pairs.
-- **Student MD vs teacher MD Li⁺ solvation** (`scripts/solvation.py`).
+- **Element-pair table as the training-time radial forward,** with a compact-species one-hot backward (from the XLA probe; see `~/apax-wt/notes/2026-10-23_xla_kernel_probe.md` in the apax workspace).
 
 ### Bugs hit along the way (kept for the record)
 - `Atoms.copy()` drops the attached SinglePointCalculator. The first `dup` build had 399 unlabelled frames and crashed apax's shift statistics. Fixed by reusing the labelled source objects.

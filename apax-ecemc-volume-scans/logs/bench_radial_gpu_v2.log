@@ -1,0 +1,20 @@
+7722 atoms, 641142 pairs, elements [1, 3, 6, 8, 9, 15], r_max 6.0
+timing on rocm:0
+exact            10.5 ms/call (1.00x)  compile  17.2 s | |dF| max 0.00e+00 meV/A  rms 0.00e+00 meV/A (F rms 0.78 eV/A) | dE 0.00e+00 meV/atom
+exact_rec        12.5 ms/call (0.84x)  compile   6.8 s | |dF| max 6.83e-03 meV/A  rms 1.03e-03 meV/A (F rms 0.78 eV/A) | dE 3.55e-05 meV/atom
+pair_table        8.0 ms/call (1.31x)  compile   4.9 s | |dF| max 4.82e-03 meV/A  rms 7.80e-04 meV/A (F rms 0.78 eV/A) | dE 1.47e-05 meV/atom
+pair_table_rec      8.2 ms/call (1.28x)  compile   4.4 s | |dF| max 6.62e-03 meV/A  rms 1.11e-03 meV/A (F rms 0.78 eV/A) | dE 2.47e-05 meV/atom
+hermite256        7.2 ms/call (1.45x)  compile   3.9 s | |dF| max 8.12e-02 meV/A  rms 9.75e-03 meV/A (F rms 0.78 eV/A) | dE 2.26e-04 meV/atom
+piecewise16_p7      7.6 ms/call (1.38x)  compile   4.1 s | |dF| max 5.23e-02 meV/A  rms 1.72e-02 meV/A (F rms 0.78 eV/A) | dE 1.09e-03 meV/atom
+piecewise32_p5      8.4 ms/call (1.25x)  compile   5.0 s | |dF| max 1.33e-01 meV/A  rms 3.22e-02 meV/A (F rms 0.78 eV/A) | dE 1.52e-03 meV/atom
+chebyshev32      14.7 ms/call (0.71x)  compile   7.4 s | |dF| max 1.08e-02 meV/A  rms 1.80e-03 meV/A (F rms 0.78 eV/A) | dE 3.87e-04 meV/atom
+18304 atoms, 1519744 pairs, elements [1, 3, 6, 8, 9, 15], r_max 6.0
+timing on rocm:0
+exact            22.3 ms/call (1.00x)  compile  18.8 s | |dF| max 0.00e+00 meV/A  rms 0.00e+00 meV/A (F rms 0.78 eV/A) | dE 0.00e+00 meV/atom
+exact_rec        23.4 ms/call (0.95x)  compile   7.4 s | |dF| max 6.75e-03 meV/A  rms 1.03e-03 meV/A (F rms 0.78 eV/A) | dE 3.54e-05 meV/atom
+pair_table       17.3 ms/call (1.29x)  compile   6.2 s | |dF| max 5.44e-03 meV/A  rms 7.81e-04 meV/A (F rms 0.78 eV/A) | dE 1.74e-05 meV/atom
+pair_table_rec     17.9 ms/call (1.24x)  compile   5.8 s | |dF| max 6.80e-03 meV/A  rms 1.10e-03 meV/A (F rms 0.78 eV/A) | dE 2.30e-05 meV/atom
+hermite256       16.1 ms/call (1.38x)  compile   5.4 s | |dF| max 8.12e-02 meV/A  rms 9.79e-03 meV/A (F rms 0.78 eV/A) | dE 2.26e-04 meV/atom
+piecewise16_p7     16.7 ms/call (1.34x)  compile   7.2 s | |dF| max 5.24e-02 meV/A  rms 1.72e-02 meV/A (F rms 0.78 eV/A) | dE 1.09e-03 meV/atom
+piecewise32_p5     16.4 ms/call (1.36x)  compile   7.2 s | |dF| max 1.34e-01 meV/A  rms 3.22e-02 meV/A (F rms 0.78 eV/A) | dE 1.52e-03 meV/atom
+chebyshev32      30.3 ms/call (0.73x)  compile   7.5 s | |dF| max 1.14e-02 meV/A  rms 1.80e-03 meV/A (F rms 0.78 eV/A) | dE 3.87e-04 meV/atom

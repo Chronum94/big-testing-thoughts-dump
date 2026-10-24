@@ -1,0 +1,20 @@
+seed: 1
+ensemble:
+  name: nve
+  dt: 0.5
+  temperature_schedule:
+    name: constant
+    T0: 300
+duration: 10000
+n_inner: 500
+sampling_rate: 20
+buffer_size: 100
+dr_threshold: 0.5
+extra_capacity: 16
+initial_structure: /home/chronum/scratch/ecemc/md_radial/start_7722.extxyz
+sim_dir: /home/chronum/scratch/ecemc/md_radial/hermite256
+traj_name: md.h5
+checkpoint_interval: 20000
+radial_table:
+  kind: hermite
+  n: 256
