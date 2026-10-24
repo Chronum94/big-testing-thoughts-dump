@@ -14,6 +14,8 @@ Constant-potential SJM runs an outer root-find on the excess electron count N, a
 - **The grand-energy extrapolation Ω(μ*) ≈ Ω(μ) − NΔμ − ½CΔμ² checks out:** under 0.7 meV error at 0.1 V off target. So the potential tolerance can be loosened safely for energies (not forces).
 - **Keeping the MSR1 mixer history across N updates is a trap.** Naive keeping is 1.4–4× worse. Re-anchoring the secants is harmless but gives nothing. The cost per outer step comes from the N perturbation itself, not from lost mixer memory.
 - **Every benchmark cell is a single run** (one target, one starting N). Path dependence of the outer loop moves totals by up to ±50%. A robustness sweep is still to do.
+- **The benchmark jellium is only 0.79 Å thick.** It is the GPAW test geometry: top at 14.5 Å in a 15 Å cell, bottom at top atom + 3 Å. All numbers here refer to that setup.
+- **Hard systems haven't been tried yet.** A merged, ranked list from three research agents is in [`HARD_CASES.md`](HARD_CASES.md): Γ-only metals, spill-out, graphene, low-density metals, semiconductors, spin, explicit water, elongated cells.
 
 ## Requirements / where things are
 
@@ -278,7 +280,10 @@ converged when   max_side ptp(W_{j−2..j}) < max(τ_wf, η·|φ_j − φ*|)
 - **Inexact multisecant Newton / grand-canonical SCF.** Solve for x = (n, N) jointly, with residual (R(n,N), w·(φ−φ*)), updating N every few SCF iterations. Precondition the N component with C_est from section 3. Gate N updates until the density residual is below about 10⁻²·⁵, because early-SCF φ swings by 1–10 eV. Then optionally put N into the MSR1 vectors. This follows from section 8: the cost is the size of the N jump, so many small jumps should beat a few large ones.
 - **Promote the adaptive criterion (section 9) into `sjm.py`**, replacing the scaled-tolerance `inexact_newton`.
 - **A robustness sweep:** 3 targets × 3 starting N × 3 metals × methods, to get distributions instead of single runs.
-- **Hard test systems:** we sent out three research agents (literature, code issue trackers, small-system design). Results to be added.
+- **Hard test systems:** see `HARD_CASES.md`. Key warnings from it:
+  - An unconverged inner SCF poisoning the outer step is the most-reported real failure, and it is exactly the risk our inexact and adaptive schemes take.
+  - For gapped electrodes, N(φ) ∝ exp(±φ/σ). φ(N) is then logarithmic, and secant steps or regression in N break down. Fix that with a local C_q slope at every attempt, bracketing in a transformed variable, or fixed-μ control (metals are better served by controlling N, semiconductors by controlling μ).
+  - JDFTx 2017 found a plain grand-canonical SCF struggled. Their modified Kerker parameters (q_κ = 0.17, q_K = 0.8 a₀⁻¹) are a starting point for idea 1.
 
 ## Files
 
