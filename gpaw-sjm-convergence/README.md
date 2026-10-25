@@ -22,6 +22,8 @@ Constant-potential SJM runs an outer root-find on the excess electron count N, a
   Precise definitions of every method and term are in [`METHODS.md`](METHODS.md).
 - **Hard systems haven't been tried yet.** A merged, ranked list from three research agents is in [`HARD_CASES.md`](HARD_CASES.md): Γ-only metals, spill-out, graphene, low-density metals, semiconductors, spin, explicit water, elongated cells.
 
+**Distilled summary:** [`LEARNED.md`](LEARNED.md) collects everything learned about solvation/SJM by topic.
+
 ## Requirements / where things are
 
 - **GPAW:** branch `sjm-convergence` in a local clone (off `master` at `ca5e191ba1`). Commit `0c6c1de0da`, "SJM: faster constant-potential equilibration", changes only `gpaw/solvation/sjm.py` and `gpaw/test/solvation/test_sjm.py`. It holds items 1–3 below. Not pushed or upstreamed; the code decision is pending.
