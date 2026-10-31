@@ -1,7 +1,7 @@
 > **Note:** this study was carried out with Claude (Anthropic's AI assistant) under close human oversight.
 > None of the conclusions here are final.
 
-# Elastic constants (and phonons, pending) of apax students vs their PET-MAD-m teacher
+# Elastic constants and phonons of apax students vs their PET-MAD-m teacher
 
 Do students distilled from a foundation model reproduce the teacher's second derivatives (elastic constants and phonons)?
 They were trained on energy, forces and stress, not on derivatives. The test set is 27 cubic tier-1 semiconductors (diamond, zincblende, rocksalt) from the
@@ -68,6 +68,26 @@ Shear derivatives aren't. This matches the dataset finding that coverage is dire
   forces at symmetric sites are ~5 meV/Å.
 - 0 K static constants. No comparison to experiment yet. The teacher itself is r2SCAN without dispersion.
 
+## Phonons ([ndsc](https://github.com/Chronum94/ndsc) nondiagonal supercells, 6×6×6 q-mesh, each model at its own relaxed a; `phon_table.md`)
+![phonons](phonons_semi.png)
+
+| | Γ optical Δ (median) | X-TA Δ (median) | band RMS vs teacher |
+|---|---|---|---|
+| seed_v3 | −1.6 % | **+16.9 %** | 0.31 THz |
+| seed_v4 | −1.1 % | **+23.5 %** | 0.33 THz |
+
+- **The zone-boundary TA branches are too stiff everywhere.** Si +48 %, Ge +47 %, Sn +40 %, III-V +12…+33 %, CdTe +36 %, HgTe +70…+150 %.
+  The flat TA bands of diamond/zincblende need long-range bond-bending interactions (the classic bond-charge-model problem).
+  The students are strictly local GMNNs at r_max 5.5 Å; PET-MAD passes messages, so its effective range is larger.
+  The teacher's optical-branch humps (SiC, BN, AlP, ZnS, ZnSe, CdTe) are also flattened in the students. Hypothesis: **locality**.
+  It's testable with the `r65` (6.5 Å) student.
+- **Γ optical is nearly right** (−1…−2 %), yet across compounds its error correlates at r = −0.94 with the excess C44 relaxation drop.
+  The drop scales as Λ²/ω_Γ², so a −1.7 % ω_Γ explains only ~+3.4 % of the +16 % excess. The rest needs the internal-strain coupling Λ to be ~6 % too strong.
+  The AD joint-Hessian route would measure Λ directly.
+- **Rocksalt: the teacher's SnTe has an imaginary Γ-TO (1.57i THz) = ferroelectric instability**, consistent with the off-centring seen in C44.
+  The students are stable (~1 THz). PbS/PbSe/PbTe are soft, and the students err in both directions. Band-ordering makes the table's rocksalt rows unreliable.
+- No LO–TO splitting (no Born charges in either model). The teacher's other imaginary flags are ≤ 0.1i THz acoustic noise near Γ.
+
 ## Pending
-- Phonon bands with [ndsc](https://github.com/Chronum94/ndsc) (nondiagonal supercells, 6×6×6 q-mesh, each model's own a₀), testing Insight 1 directly via Γ-TO.
-  Early Si point: Γ-TO 15.12 (v3) vs 15.27 THz (teacher), but TA(X) 7.04 vs 4.77 THz. So the error is mode-specific, not a uniform softening.
+- Locality test: TA(X) for the `r65` (6.5 Å) and `base_r55` students.
+- AD joint Hessian (u, ε) → C⁰, Λ, Φ_Γ blocks, splitting the C44 error exactly.
