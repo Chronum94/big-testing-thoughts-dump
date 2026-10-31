@@ -49,6 +49,19 @@ Shear derivatives aren't. This matches the dataset finding that coverage is dire
   Under shear the teacher's ions off-centre (the incipient ferroelectric soft TO mode; real SnTe goes rhombohedral below ~100 K).
   The students don't relax at all (−100 % drop). The students miss the soft mode, which stiffens them.
 
+## LGPS, PBA, bcc Li (full tensors, `scripts/elastic_gen.py`, `sol_compare.md`)
+| system | student | worst constants | bulk / shear |
+|---|---|---|---|
+| LGPS (50 atoms, lowest Li ordering) | lgB5_s1 / s2 | all within 0–6 % | B −4/−5 %, G −2/−4 % |
+| PBA K0 / K4 (K-Fe cyanide framework) | pba_v0_s1 / asinh | **C44 −30…−46 % / −21…−35 %** | B ±1 %, G −2…−7 % |
+| PBA K8 | same | C44 teacher 1.9 GPa (near-unstable): +84 % / +13 % | B −2 / −11 % |
+| bcc Li (cubic imposed) | li_v0, li_R5_s1, li_R5_s2 | **C′ = +1.9 / +2.8 / +2.3 GPa vs teacher −0.23** | B 13.0–14.3 vs 12.9 |
+
+- **PBA:** the framework's soft shear (C≡N bridge bending) is under-learned. It's the same story as the semiconductor C44: volume is right, shear is too soft.
+- **The teacher says bcc Li is unstable.** With no symmetry imposed, PET-MAD-m relaxes bcc → fct (c/a ≈ 1.45, toward fcc).
+  With cubic symmetry imposed, its tetragonal shear modulus C′ is negative. The students all stabilise bcc, disagreeing with their teacher.
+  Experiment (low T, from memory, not checked) has a small positive C′. Lesson: run the stability check on the **teacher** too.
+
 ## Caveats
 - One seed per student. Seed noise was ~10 % on aggregates in this dataset, so per-compound differences < 10 % are not significant.
 - Teacher stress noise: C asymmetry up to 0.85 GPa, residual stress at relaxed a up to 0.23 GPa. PET isn't exactly equivariant:
@@ -58,4 +71,3 @@ Shear derivatives aren't. This matches the dataset finding that coverage is dire
 ## Pending
 - Phonon bands with [ndsc](https://github.com/Chronum94/ndsc) (nondiagonal supercells, 6×6×6 q-mesh, each model's own a₀), testing Insight 1 directly via Γ-TO.
   Early Si point: Γ-TO 15.12 (v3) vs 15.27 THz (teacher), but TA(X) 7.04 vs 4.77 THz. So the error is mode-specific, not a uniform softening.
-- Full tensors for LGPS, PBA (K0/K4/K8) and bcc Li (`scripts/elastic_gen.py`, adds Kelvin/Mandel eigenvalues).
