@@ -17,6 +17,8 @@ They were trained on energy, forces and stress, not on derivatives. The test set
   The scripts include a CPU-restore shim for GPU-saved orbax checkpoints.
 - Teacher on CPU (pet-jax, 8 threads): ~45 s per material. Students: ~10 s.
 
+![elastic](elastic_semi.png)
+
 ## Results: relaxed-ion, student vs teacher (full tables in `semi_compare.md`)
 
 | model | a₀ | C11 | C12 | C44 | B | Born-stable |
